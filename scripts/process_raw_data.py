@@ -140,8 +140,56 @@ if __name__ == "__main__":
              normals=np.array(pcd_o3d.normals), binary=False)  
     print(f"PCD time: {(time.time() - start):.4f}s")
 
-# class ProcessRawCamData:
-#     def __init__(self, inp_dir, depth_thresh, )
+
+class ProcessRawCamData:
+    def __init__(self, inp_dir, save_base_dir, save_rgb, save_depth, save_mask, save_pcd, seg_pcd, depth_type):
+        self.inp_dir = inp_dir
+        self.save_base_dir = save_base_dir
+        self.save_rgb = save_rgb
+        self.save_depth = save_depth,
+        self.save_mask = save_mask,
+        self.save_pcd  = save_pcd,
+        self.seg_pcd = seg_pcd
+        self.depth_type = depth_type
+
+
+    def save_rgbs(self,):
+        start = time.time()
+        imgs_pths = sorted(glob.glob(osp.join(self.inp_dir, '*.bgr.npz')))
+        for (imp) in tqdm(imgs_pths):
+            bgr = dict(np.load(imp))['arr_0']
+    
+            rgb_sdir = osp.join(args.save_base_dir, self._get_seq_name(self.inp_dir), 'rgb')
+            os.makedirs(rgb_sdir, exist_ok=True)
+            fn_rgb = osp.join(rgb_sdir, osp.basename(imp).replace('bgr.npz', 'png'))
+            cv2.imwrite(fn_rgb, bgr)
+        print(f"rgb save here: {rgb_sdir}")
+
+    def save_depth_maps(self,):
+        "save depth values of each pixels"
+        pass
+    
+    def save_masks(self,):
+        "save foreground masks"
+        pass
+
+    def save_pointclouds(self, with_color=True, with_normals=True):
+        "save poinclouds"
+        pass
+
+    def _get_seq_name(self,):
+        """
+        seq_dir: "../../../seq_name" 
+        """
+        seq_name = self.inp_dir.rstrip('/').split('/')[-1]
+
+        return seq_name
+
+
+
+    
+
+    
 
 
 
