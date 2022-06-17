@@ -1,6 +1,9 @@
 # python process_raw_data.py --save_rgb --save_depth --save_pcd --depth_thresh 1.0 --depth_type dist_xyz
 
+from http.client import PRECONDITION_REQUIRED
+from re import M
 from signal import default_int_handler
+from ssl import VERIFY_X509_TRUSTED_FIRST
 import numpy as np
 import matplotlib.pyplot as plt
 import glob, copy
@@ -11,8 +14,17 @@ import ipdb
 bb = ipdb.set_trace
 import cv2
 import open3d as o3d
+import time
+from io3d import *
 
-from .io3d import *
+def _get_seq_name(seq_dir):
+    """
+    seq_dir: "../../../seq_name/pointcloud" 
+    """
+    seq_name = seq_dir.rstrip('/').split('/')[-2]
+
+    return seq_name
+
 
 if __name__ == "__main__":
     import argparse
@@ -49,9 +61,11 @@ if __name__ == "__main__":
     # get paths
     imgs_pths = sorted(glob.glob(osp.join(args.inp_dir, '*.bgr.npz')))
     # pcds_pths = sorted(glob.glob(osp.join(args.inp_dir, '*.xyz.npz')))
-    bb()
-    for (imp) in tqdm(zip(imgs_pths)):
-        if args.save_rgb or args.save_pcd:
+
+    start = time.time()
+    for (imp) in tqdm(imgs_pths):
+        
+        if args.save_rgb and args.save_pcd:
             pcdp = imp.replace('bgr', 'xyz')
             assert(osp.isfile(pcdp), f"file {pcdp} does not exist")
         
@@ -66,81 +80,68 @@ if __name__ == "__main__":
 
         # save rgb
         if args.save_rgb: 
-            rgb_sdir = osp.join(args.save_base_dir, 'rgb')
+            rgb_sdir = osp.join(args.save_base_dir, _get_seq_name(args.inp_dir), 'rgb')
             os.makedirs(rgb_sdir, exist_ok=True)
             fn_rgb = osp.join(rgb_sdir, osp.basename(imp).replace('bgr.npz', 'png'))
             cv2.imwrite(fn_rgb, bgr)
-        
+
         # save depth
         if args.save_depth:
             if args.depth_type == 'zaxis_val':
                 depth = xyz[:, :, 2]
-            elif args.depth_type == 'xyz_dist':
+            elif args.depth_type == 'dist_xyz':
                 depth = np.linalg.norm(xyz, axis=2)
             else:
                 raise ValueError('Wrong "depth_type" argument')
 
-            depth_sdir = osp.join(args.save_base_dir, 'depth')
+            depth_sdir = osp.join(args.save_base_dir, _get_seq_name(args.inp_dir), 'depth')
             os.makedirs(depth_sdir, exist_ok=True)
             fn_depth = osp.join(depth_sdir, osp.basename(imp).replace('bgr.npz', 'png'))
-            cv2.imwrite(fn_rgb, depth)
-        
+            depth_norm = (depth * 255 / (depth.max() - depth.min())).astype(np.uint8)
+            cv2.imwrite(fn_depth, depth)
+
         # save foreground masks
         if args.save_mask:
             pass
-
+        
         # save pcds
         if args.save_pcd:
             xyz_resh = xyz.reshape(-1, 3)
             xyz_color_resh = bgr.reshape(-1, 3)
-            depth_z_resh = depth.reshape(-1, 3)
+            depth_resh = depth.flatten()
 
             if args.seg_pcd:
                 args.depth_thresh = depth.max()
-
-            sel_inds = depth < args.depth_thresh
+            
+            sel_inds = depth_resh < args.depth_thresh
             xyz_sel = xyz_resh[sel_inds]
             xyz_color_sel = xyz_color_resh[sel_inds]
-
+            
             pcd_o3d = o3d.geometry.PointCloud()
-            pcd_o3d.points = o3d.cpu.pybind.utility.Vector3dVector(xyz_sel)
-            pcd_o3d.colors = o3d.cpu.pybind.utility.Vector3dVector(xyz_color_sel)
+            pcd_o3d.points = o3d.pybind.utility.Vector3dVector(xyz_sel)
+            pcd_o3d.colors = o3d.pybind.utility.Vector3dVector(xyz_color_sel)
             pcd_o3d.estimate_normals() # verify this operation
             
             if args.seg_pcd:
-                pcd_wn_sdir = osp.join(args.save_base_dir, 'seg_xyz_wn')
+                pcd_wn_sdir = osp.join(args.save_base_dir, _get_seq_name(args.inp_dir), 'seg_xyz_wn')
+                pcd_wn_wc_sdir = osp.join(args.save_base_dir, _get_seq_name(args.inp_dir), 'seg_xyz_wn_wc')
             else:
-                pcd_wn_sdir = osp.join(args.save_base_dir, 'xyz_wn')
-
+                pcd_wn_sdir = osp.join(args.save_base_dir, _get_seq_name(args.inp_dir), 'xyz_wn')
+                pcd_wn_wc_sdir = osp.join(args.save_base_dir, _get_seq_name(args.inp_dir), 'xyz_wn_wc')
+            
             os.makedirs(pcd_wn_sdir, exist_ok=True)
             fn_pcd_wn = osp.join(pcd_wn_sdir, osp.basename(imp).replace('bgr.npz', 'ply'))
+            write_ply(fn_pcd_wn, verts=xyz_sel, trias=None, color=None,
+             normals=np.array(pcd_o3d.normals), binary=False) 
             
-            write_ply(path=fn_pcd_wn, verts=xyz_sel, trias=None, color=xyz_color_sel,
-             normals=np.array(pcd_o3d.normals), binary=False)  
-            pcd_wn_wc_sdir = osp.join(args.save_base_dir, 'xyz_wn_wc')
             os.makedirs(pcd_wn_wc_sdir, exist_ok=True)
+            fn_pcd_wn_wc = osp.join(pcd_wn_wc_sdir, osp.basename(imp).replace('bgr.npz', 'ply'))
+            write_ply(fn_pcd_wn_wc, verts=xyz_sel, trias=None, color=xyz_color_sel,
+             normals=np.array(pcd_o3d.normals), binary=False)  
+    print(f"PCD time: {(time.time() - start):.4f}s")
 
-
-class ProcessRawCamData:
-    def __init__(self, inp_dir, depth_thresh, )
-
-
-
-
-            
-                      
-
-
-
-
-
-
-
-        
-
-
-
-        
+# class ProcessRawCamData:
+#     def __init__(self, inp_dir, depth_thresh, )
 
 
 

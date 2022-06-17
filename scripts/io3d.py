@@ -3,6 +3,28 @@
 import struct
 import numpy as np
 import collections
+import traceback
+
+
+PLY_HEADER = 'ply\nformat ascii 1.0\nelement vertex {}\nproperty float x\nproperty float y\nproperty float z\nproperty float nx\nproperty float ny\nproperty float nz\nproperty float red\nproperty flaot green\nproperty flaot blue\nend_header\n'
+
+def write_ply_slow(ply_file_name, verts, normals):
+    """
+    func to write pcd with normals
+    """
+    try:
+        verts_num = verts.shape[0]
+        with open(ply_file_name, 'w') as f:
+            f.write(PLY_HEADER.format(verts_num))
+        with open(ply_file_name, 'ab') as f:
+            np.savetxt(f, np.hstack((verts, normals)), fmt='%.5f', delimiter=' ')
+        return True
+    except:
+        print('Error in write_ply_file! ({})'.format(ply_file_name))
+        print(traceback.format_exc())
+        return False
+
+
 
 def _write_ply_point(fp, x,y,z, color=None, normal=None, binary=False):
     args = [x,y,z]
