@@ -13,7 +13,6 @@ bb = ipdb.set_trace
 import cv2
 import open3d as o3d
 
-
 def imgs2vid_ffmpeg(imgs_dir, file_pth, ext='png',  frm_rate=10):
     import os
     print(f"ffmpeg creating video...")
@@ -42,7 +41,7 @@ def create_target_pcd(src_pcd_pth, tran=[0., 0., 0.], rot=[0., 0., 0.]):
 
         return pcd, trnsfm
 
-        
+ 
 def write_o3d_pcd(file_path, pcd_o3d):
         import open3d as o3d
         import os
