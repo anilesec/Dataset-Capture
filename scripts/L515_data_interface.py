@@ -28,7 +28,6 @@ class L515DataInterface:
         self.pcd_with_normals = pcd_with_normals
         self.dist_thresh = dist_thresh
 
-
     def save_rgbs(self,):
         print("Saving rgbs...")
         start = time.time()
@@ -46,7 +45,6 @@ class L515DataInterface:
         print(f'RGB Save Time: {(time.time() - start):0.4f}s')
         print(f"rgb save here: {rgb_sdir}")
         
-
         return None
     
     def save_pointclouds(self,):
@@ -173,14 +171,63 @@ class L515DataInterface:
         return None
 
 if __name__ == "__main__":
-    interface = L515DataInterface(inp_seq_dir='/tmp-network/user/aswamy/L515_seqs/20220614/20220614171547',
-    save_base_dir='/tmp-network/user/aswamy/temp/', save_rgb=False, save_depth=False,
-     save_mask=False, save_pcd=True, pcd_bkgd_rm=True, pcd_with_color=False,
-     pcd_with_normals=False, dist_thresh=0.8, depth_type='dist_xyz')
-    bb()
-    # interface.save_rgbs()  # works
-    # interface.save_pointclouds()
+    import argparse
+
+    parser = argparse.ArgumentParser("Processing captured raw data")
+
+    parser.add_argument('--inp_seq_dir', type=str, default='/tmp-network/user/aswamy/L515_seqs/20220614/20220614171547/pointcloud',
+                        help='path to the input data dir(dir with *.bgr.npz and *.xyz.npz')
+    parser.add_argument('--save_base_dir', type=str, default='/tmp-network/dataset/hand-obj',
+                        help='base path to save processed data')
+    parser.add_argument('--save_rgb', action='store_true',
+                        help='flag to save rgb image')    
+    parser.add_argument('--save_depth', action='store_true',
+                        help='flag to save depth')    
+    parser.add_argument('--save_pcd', action='store_true',
+                        help='flag to save only xyz')
+    parser.add_argument('--save_mask', action='store_true',
+                        help='flag to save foreground mask, need save_pcd and seg_pcd flags to be set')                        
+    parser.add_argument('--pcd_normals', action='store_true',
+                        help='flag to compute pcd normals')  
+    parser.add_argument('--pcd_color', action='store_true',
+                        help='flag to save pcd color')                        
+    parser.add_argument('--pcd_bkgd_rm', action='store_true',
+                        help='flag to segment foreground poincloud, needs save_pcd flag to be set')  
+    parser.add_argument('--depth_thresh', type=float, required=True,
+                        help='depth/dist threshold in (meters) to segment the foreground(hand+obj)')
+    parser.add_argument('--depth_type', type=str, default='dist_xyz',
+                        help='depth value choice; "dist_xyz":distance of pcd or "zaxis_val":z-axis val of pcd') 
+
+    args = parser.parse_args()
+
+    print("args:", args)     
+
+    # create class instance
+    interface = L515DataInterface(
+        inp_seq_dir=args.inp_seq_dir,
+        save_base_dir=args.save_base_dir,
+        save_rgb=args.save_rgb,
+        save_depth=args.save_depth,
+        save_mask=args.save_mask,
+        save_pcd=args.save_pcd,
+        pcd_bkgd_rm=args.pcd_bkgd_rm,
+        depth_type=args.depth_type,
+        pcd_with_color=args.pcd_color,
+        pcd_with_normals=args.pcd_normals,
+        dist_thresh=args.depth_thresh
+    )
+    # run class instance
     interface()
+    
+    
+    # or run below lines for test
+    # interface = L515DataInterface(inp_seq_dir='/tmp-network/user/aswamy/L515_seqs/20220614/20220614171547',
+    # save_base_dir='/tmp-network/user/aswamy/temp/', save_rgb=False, save_depth=False,
+    #  save_mask=False, save_pcd=True, pcd_bkgd_rm=True, pcd_with_color=False,
+    #  pcd_with_normals=False, dist_thresh=0.8, depth_type='dist_xyz')
+    # interface.save_rgbs() # for rgb
+    # interface.save_pointclouds() # for pcd
+    # interface() # for both rgb and pcds
     print('Done!!')
     
 
