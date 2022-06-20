@@ -19,17 +19,18 @@ class L515DataInterface:
         self.inp_seq_dir = inp_seq_dir
         self.save_base_dir = save_base_dir
         self.save_rgb = save_rgb
-        self.save_depth = save_depth,
-        self.save_mask = save_mask,
-        self.save_pcd  = save_pcd,
-        self.pcd_bkgd_rm = pcd_bkgd_rm,
-        self.depth_type = depth_type,
-        self.pcd_with_color = pcd_with_color,
-        self.pcd_with_normals = pcd_with_normals,
-        self.dist_thresh = dist_thresh,
+        self.save_depth = save_depth
+        self.save_mask = save_mask
+        self.save_pcd  = save_pcd
+        self.pcd_bkgd_rm = pcd_bkgd_rm
+        self.depth_type = depth_type
+        self.pcd_with_color = pcd_with_color
+        self.pcd_with_normals = pcd_with_normals
+        self.dist_thresh = dist_thresh
 
 
     def save_rgbs(self,):
+        print("Saving rgbs...")
         start = time.time()
         imgs_pths = sorted(glob.glob(osp.join(self.inp_seq_dir, 'pointcloud', '*.bgr.npz')))
         assert len(imgs_pths) > 0, f"No .bgr.npz files in given seq dir:{self.inp_seq_dir}"
@@ -41,14 +42,18 @@ class L515DataInterface:
             bgr = dict(np.load(imp))['arr_0']    
             fn_rgb = osp.join(rgb_sdir, osp.basename(imp).replace('bgr.npz', 'png'))
             cv2.imwrite(fn_rgb, bgr)
+        print('Done!')
         print(f'RGB Save Time: {(time.time() - start):0.4f}s')
         print(f"rgb save here: {rgb_sdir}")
+        
 
         return None
     
     def save_pointclouds(self,):
         "save poinclouds"
+        print('Saving PCDs...')
         start = time.time()
+
         pcds_pths = sorted(glob.glob(osp.join(self.inp_seq_dir, 'pointcloud', '*.xyz.npz')))
         assert len(pcds_pths) > 0, f"No .xyz.npz files in given seq dir:{self.inp_seq_dir}"
 
@@ -75,32 +80,45 @@ class L515DataInterface:
             else:
                 xyz_sel = xyz_resh
                 clr_sel = xyz_color_resh
-
-            if self.pcd_with_color:
-                pcd_sdir = osp.join(self.save_base_dir, self._get_seq_name, 'xyz_wc')
-                os.makedirs(pcd_sdir, exist_ok=True)
-                fn_pcd = osp.join(pcd_sdir, osp.basename(imp).replace('bgr.npz', 'ply'))
-                write_ply(fn_pcd, verts=xyz_sel, trias=None, color=clr_sel, normals=None, binary=False)
-            elif self.pcd_with_normals:
-                pcd_sdir = osp.join(self.save_base_dir, self._get_seq_name, 'xyz_wn')
-                os.makedirs(pcd_sdir, exist_ok=True)
-                fn_pcd = osp.join(pcd_sdir, osp.basename(imp).replace('bgr.npz', 'ply'))
-                # compute normals
-                xyz_nrmls = self._compute_normals(pts=xyz, rad=0.05, maxnn=10)
-                write_ply(fn_pcd, verts=xyz_sel, trias=None, color=None, normals=xyz_nrmls, binary=False)
-            elif self.pcd_with_color and self.pcd_with_normals:
-                pcd_sdir = osp.join(self.save_base_dir, self._get_seq_name, 'xyz_wc_wn')
+            
+            if self.pcd_with_color and self.pcd_with_normals:
+                if self.pcd_bkgd_rm:
+                    pcd_sdir = osp.join(self.save_base_dir, self._get_seq_name, 'fgnd_xyz_wc_wn')
+                else:
+                    pcd_sdir = osp.join(self.save_base_dir, self._get_seq_name, 'xyz_wc_wn')
                 os.makedirs(pcd_sdir, exist_ok=True)
                 fn_pcd = osp.join(pcd_sdir, osp.basename(imp).replace('bgr.npz', 'ply'))
                 # compute normals
                 xyz_nrmls = self._compute_normals(pts=xyz, rad=0.05, maxnn=10)
                 write_ply(fn_pcd, verts=xyz_sel, trias=None, color=clr_sel, normals=xyz_nrmls, binary=False)
+            elif self.pcd_with_normals:
+                if self.pcd_bkgd_rm:
+                    pcd_sdir = osp.join(self.save_base_dir, self._get_seq_name, 'fgnd_xyz_wn')
+                else:
+                    pcd_sdir = osp.join(self.save_base_dir, self._get_seq_name, 'xyz_wn')
+                os.makedirs(pcd_sdir, exist_ok=True)
+                fn_pcd = osp.join(pcd_sdir, osp.basename(imp).replace('bgr.npz', 'ply'))
+                # compute normals
+                xyz_nrmls = self._compute_normals(pts=xyz, rad=0.05, maxnn=10)
+                write_ply(fn_pcd, verts=xyz_sel, trias=None, color=None, normals=xyz_nrmls, binary=False)
+            elif self.pcd_with_color:
+                if self.pcd_bkgd_rm:
+                    pcd_sdir = osp.join(self.save_base_dir, self._get_seq_name, 'fgnd_xyz_wc')
+                else:
+                    pcd_sdir = osp.join(self.save_base_dir, self._get_seq_name, 'xyz_wc')
+                os.makedirs(pcd_sdir, exist_ok=True)
+                fn_pcd = osp.join(pcd_sdir, osp.basename(imp).replace('bgr.npz', 'ply'))
+                write_ply(fn_pcd, verts=xyz_sel, trias=None, color=clr_sel, normals=None, binary=False)
             else:
-                pcd_sdir = osp.join(self.save_base_dir, self._get_seq_name, 'xyz')
+                if self.pcd_bkgd_rm:
+                    pcd_sdir = osp.join(self.save_base_dir, self._get_seq_name, 'fgnd_xyz')
+                else:
+                    pcd_sdir = osp.join(self.save_base_dir, self._get_seq_name, 'xyz')
                 os.makedirs(pcd_sdir, exist_ok=True)
                 fn_pcd = osp.join(pcd_sdir, osp.basename(imp).replace('bgr.npz', 'ply'))
                 write_ply(fn_pcd, verts=xyz_sel, trias=None, color=clr_sel, normals=None, binary=False)
 
+        print('Done!')
         print(f'PCD Save Time: {(time.time() - start):0.4f}s')
         print(f"PCD saved here: {pcd_sdir}")
         
@@ -110,9 +128,13 @@ class L515DataInterface:
         "save depth values of each pixels"
         raise NotImplementedError("Depth maps should be computed!")
 
+        return None
+
     def save_masks(self,):
         "save foreground masks"
         raise NotImplementedError("foregorund masks should be computed!")
+
+        return None
 
     @property
     def _get_seq_name(self,):
@@ -137,15 +159,28 @@ class L515DataInterface:
         pcd_o3d.points = o3d.pybind.utility.Vector3dVector(pts)
         pcd_o3d.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=rad, max_nn=maxnn))
         return np.array(pcd_o3d.normals)
+    
+    def __call__(self):
+        if self.save_rgb:
+            self.save_rgbs()
+        if self.save_pcd:    
+            self.save_pointclouds()
+        if self.save_depth:
+            self.save_depth_maps()
+        if self.save_mask:
+            self.save_masks()
+
+        return None
 
 if __name__ == "__main__":
     interface = L515DataInterface(inp_seq_dir='/tmp-network/user/aswamy/L515_seqs/20220614/20220614171547',
-    save_base_dir='/tmp-network/user/aswamy/temp/', save_rgb=True, save_depth=False,
+    save_base_dir='/tmp-network/user/aswamy/temp/', save_rgb=False, save_depth=False,
      save_mask=False, save_pcd=True, pcd_bkgd_rm=True, pcd_with_color=False,
      pcd_with_normals=False, dist_thresh=0.8, depth_type='dist_xyz')
-
-    # interface.save_rgbs()  # works
     bb()
-    interface.save_pointclouds()
+    # interface.save_rgbs()  # works
+    # interface.save_pointclouds()
+    interface()
+    print('Done!!')
     
 
