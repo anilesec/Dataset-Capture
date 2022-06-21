@@ -114,7 +114,7 @@ class L515DataInterface:
                     pcd_sdir = osp.join(self.save_base_dir, self._get_seq_name, 'xyz')
                 os.makedirs(pcd_sdir, exist_ok=True)
                 fn_pcd = osp.join(pcd_sdir, osp.basename(imp).replace('bgr.npz', 'ply'))
-                write_ply(fn_pcd, verts=xyz_sel, trias=None, color=clr_sel, normals=None, binary=False)
+                write_ply(fn_pcd, verts=xyz_sel, trias=None, color=None, normals=None, binary=False)
 
         print('Done!')
         print(f'PCD Save Time: {(time.time() - start):0.4f}s')
@@ -203,31 +203,31 @@ if __name__ == "__main__":
     print("args:", args)     
 
     # create class instance
-    interface = L515DataInterface(
-        inp_seq_dir=args.inp_seq_dir,
-        save_base_dir=args.save_base_dir,
-        save_rgb=args.save_rgb,
-        save_depth=args.save_depth,
-        save_mask=args.save_mask,
-        save_pcd=args.save_pcd,
-        pcd_bkgd_rm=args.pcd_bkgd_rm,
-        depth_type=args.depth_type,
-        pcd_with_color=args.pcd_color,
-        pcd_with_normals=args.pcd_normals,
-        dist_thresh=args.depth_thresh
-    )
-    # run class instance
-    interface()
+    # interface = L515DataInterface(
+    #     inp_seq_dir=args.inp_seq_dir,
+    #     save_base_dir=args.save_base_dir,
+    #     save_rgb=args.save_rgb,
+    #     save_depth=args.save_depth,
+    #     save_mask=args.save_mask,
+    #     save_pcd=args.save_pcd,
+    #     pcd_bkgd_rm=args.pcd_bkgd_rm,
+    #     depth_type=args.depth_type,
+    #     pcd_with_color=args.pcd_color,
+    #     pcd_with_normals=args.pcd_normals,
+    #     dist_thresh=args.depth_thresh
+    # )
+    # # run class instance
+    # interface()
     
-    
+
     # or run below lines for test
-    # interface = L515DataInterface(inp_seq_dir='/tmp-network/user/aswamy/L515_seqs/20220614/20220614171547',
-    # save_base_dir='/tmp-network/user/aswamy/temp/', save_rgb=False, save_depth=False,
-    #  save_mask=False, save_pcd=True, pcd_bkgd_rm=True, pcd_with_color=False,
-    #  pcd_with_normals=False, dist_thresh=0.8, depth_type='dist_xyz')
+    interface = L515DataInterface(inp_seq_dir='/tmp-network/user/aswamy/L515_seqs/20220614/20220614171547',
+    save_base_dir='/tmp-network/dataset/hand-obj', save_rgb=True, save_depth=False,
+     save_mask=False, save_pcd=True, pcd_bkgd_rm=True, pcd_with_color=False,
+     pcd_with_normals=False, dist_thresh=0.8, depth_type='dist_xyz')
     # interface.save_rgbs() # for rgb
     # interface.save_pointclouds() # for pcd
-    # interface() # for both rgb and pcds
+    interface() # for both rgb and pcds
     print('Done!!')
     
 
