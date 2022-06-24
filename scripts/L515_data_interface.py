@@ -1,5 +1,3 @@
-from contextlib import AsyncExitStack
-from dis import dis
 import numpy as  np
 import glob, copy
 from tqdm import tqdm
@@ -9,7 +7,7 @@ import cv2
 import time
 import os
 osp = os.path
-from io3d import *
+# from io3d import *
 # import open3d as o3d
 
 class L515DataInterface:
@@ -72,7 +70,7 @@ class L515DataInterface:
             xyz_color_resh = bgr[:, :, ::-1].reshape(-1, 3) 
 
             if self.pcd_bkgd_rm:
-                sel_inds, _ = self._pcd_bkgd_rm(pts=xyz_resh)
+                sel_inds, _ = self._pcd_bkgd_rm(pts=xyz_resh, dist_thresh=self.dist_thresh)
                 xyz_sel = xyz_resh[sel_inds]
                 clr_sel = xyz_color_resh[sel_inds]
             else:
@@ -130,7 +128,38 @@ class L515DataInterface:
 
     def save_masks(self,):
         "save foreground masks"
-        raise NotImplementedError("foregorund masks should be computed!")
+        print('Saving masks...')
+        start = time.time() 
+
+        mask_sdir = osp.join(self.save_base_dir, self._get_seq_name, 'mask')
+        os.makedirs(mask_sdir, exist_ok=True)
+
+        pcds_pths = sorted(glob.glob(osp.join(self.inp_seq_dir, 'pointcloud', '*.xyz.npz')))
+        assert len(pcds_pths) > 0, f"No .xyz.npz files in given seq dir:{self.inp_seq_dir}"
+
+        for pcdp in tqdm(pcds_pths):
+            xyz_raw = dict(np.load(pcdp))['arr_0']
+
+            # replace nan to 0
+            if np.isnan(xyz_raw).any():
+                xyz = np.nan_to_num(xyz_raw) 
+            else:
+                xyz = xyz_raw   
+            
+            # replace 0 dist with max dist values
+            xyz_dist = np.linalg.norm(xyz, axis=2)
+            xyz_dist = np.where(xyz_dist==0., xyz_dist.max(), xyz_dist)
+
+            sel_inds =  xyz_dist < self.dist_thresh
+            mask = (sel_inds.astype(np.uint8) * 255).reshape(*sel_inds.shape, 1)
+            mask_3ch = np.repeat(mask, repeats=3, axis=2)
+
+            fn_mask = osp.join(mask_sdir, osp.basename(pcdp).replace('xyz.npz', 'png'))
+            cv2.imwrite(fn_mask, mask_3ch)
+
+        print('Done!')
+        print(f'RGB Save Time: {(time.time() - start):0.4f}s')
+        print(f"rgb save here: {mask_sdir}")
 
         return None
 
@@ -143,11 +172,11 @@ class L515DataInterface:
 
         return seq_name
     
-    def _pcd_bkgd_rm(self, pts):
+    def _pcd_bkgd_rm(self, pts, dist_thresh):
         "dist_thresh to be set manually for each seq"
         pts = pts.reshape(-1, 3)
         dist = np.linalg.norm(pts, axis=1)
-        sel_inds = dist < self.dist_thresh
+        sel_inds = dist < dist_thresh
         pts_sel = pts[sel_inds]
         
         return sel_inds, pts_sel
@@ -229,5 +258,3 @@ if __name__ == "__main__":
     # interface.save_pointclouds() # for pcd
     interface() # for both rgb and pcds
     print('Done!!')
-    
-
