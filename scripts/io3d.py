@@ -4,7 +4,7 @@ import struct
 import numpy as np
 import collections
 import traceback
-
+from ipdb import set_trace as bb
 
 PLY_HEADER = 'ply\nformat ascii 1.0\nelement vertex {}\nproperty float x\nproperty float y\nproperty float z\nproperty float nx\nproperty float ny\nproperty float nz\nproperty float red\nproperty flaot green\nproperty flaot blue\nend_header\n'
 
@@ -24,14 +24,14 @@ def write_ply_slow(ply_file_name, verts, normals):
         print(traceback.format_exc())
         return False
 
-
-
 def _write_ply_point(fp, x,y,z, color=None, normal=None, binary=False):
     args = [x,y,z]
-    if color is not None:
-        args += [int(color[0]), int(color[1]), int(color[2])]
+    # if color is not None:
+    #     args += [int(color[0]), int(color[1]), int(color[2])]
     if normal is not None:
         args += [normal[0],normal[1],normal[2]]
+    if color is not None:
+        args += [int(color[0]), int(color[1]), int(color[2])]
     if binary:
         fmt = '<fff'
         if color is not None:
@@ -42,9 +42,9 @@ def _write_ply_point(fp, x,y,z, color=None, normal=None, binary=False):
     else:
         fmt = '%f %f %f'
         if color is not None:
-            fmt = fmt + ' %d %d %d'
-        if normal is not None:
             fmt = fmt + ' %f %f %f'
+        if normal is not None:
+            fmt = fmt + ' %d %d %d'
         fmt += '\n'
         fp.write(fmt % tuple(args))
 
@@ -80,13 +80,13 @@ def write_ply(path, verts, trias=None, color=None, normals=None, binary=False):
         _write_ply_header_line(fp, "property float y\n", binary)
         _write_ply_header_line(fp, "property float z\n", binary)
         if color is not None:
-            _write_ply_header_line(fp, "property uchar red\n", binary)
-            _write_ply_header_line(fp, "property uchar green\n", binary)
-            _write_ply_header_line(fp, "property uchar blue\n", binary)
-        if normals is not None:
             _write_ply_header_line(fp, "property float nx\n", binary)
             _write_ply_header_line(fp, "property float ny\n", binary)
             _write_ply_header_line(fp, "property float nz\n", binary)
+        if normals is not None:
+            _write_ply_header_line(fp, "property uchar red\n", binary)
+            _write_ply_header_line(fp, "property uchar green\n", binary)
+            _write_ply_header_line(fp, "property uchar blue\n", binary)
         if trias is not None:
             _write_ply_header_line(fp, "element face %d\n" % (trias.shape[0]), binary)
             _write_ply_header_line(fp, "property list uchar int32 vertex_indices\n", binary)
@@ -111,6 +111,8 @@ def write_ply(path, verts, trias=None, color=None, normals=None, binary=False):
         if trias is not None:
             for t in trias:
                 _write_ply_triangle(fp, t[0],t[1],t[2], binary)
+            
+    return print(f"saved here: {path}")    
 
 def faces_to_triangles(faces):
     new_faces = []
