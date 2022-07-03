@@ -26,10 +26,8 @@ def write_ply_slow(ply_file_name, verts, normals):
 
 def _write_ply_point(fp, x,y,z, color=None, normal=None, binary=False):
     args = [x,y,z]
-    # if color is not None:
-    #     args += [int(color[0]), int(color[1]), int(color[2])]
     if normal is not None:
-        args += [normal[0],normal[1],normal[2]]
+        args += [normal[0], normal[1], normal[2]]
     if color is not None:
         args += [int(color[0]), int(color[1]), int(color[2])]
     if binary:
@@ -42,9 +40,9 @@ def _write_ply_point(fp, x,y,z, color=None, normal=None, binary=False):
     else:
         fmt = '%f %f %f'
         if color is not None:
-            fmt = fmt + ' %f %f %f'
-        if normal is not None:
             fmt = fmt + ' %d %d %d'
+        if normal is not None:
+            fmt = fmt + ' %f %f %f'
         fmt += '\n'
         fp.write(fmt % tuple(args))
 
@@ -79,11 +77,11 @@ def write_ply(path, verts, trias=None, color=None, normals=None, binary=False):
         _write_ply_header_line(fp, "property float x\n", binary)
         _write_ply_header_line(fp, "property float y\n", binary)
         _write_ply_header_line(fp, "property float z\n", binary)
-        if color is not None:
+        if normals is not None:
             _write_ply_header_line(fp, "property float nx\n", binary)
             _write_ply_header_line(fp, "property float ny\n", binary)
             _write_ply_header_line(fp, "property float nz\n", binary)
-        if normals is not None:
+        if color is not None:
             _write_ply_header_line(fp, "property uchar red\n", binary)
             _write_ply_header_line(fp, "property uchar green\n", binary)
             _write_ply_header_line(fp, "property uchar blue\n", binary)
