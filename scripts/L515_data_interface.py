@@ -7,13 +7,13 @@ import cv2
 import time
 import os
 osp = os.path
-# from io3d import *
+from scripts.io3d import *
 # import open3d as o3d
 
 class L515DataInterface:
     def __init__(self, inp_seq_dir, save_base_dir, save_rgb=False, save_depth=False,
      save_mask=False, save_pcd=False, pcd_bkgd_rm=False, pcd_with_color=False,
-     pcd_with_normals=False, dist_thresh=0.8, depth_type='dist_xyz'):
+     pcd_with_normals=False, dist_thresh=0.8, crop_arm=False, depth_type='dist_xyz'):
         self.inp_seq_dir = inp_seq_dir
         self.save_base_dir = save_base_dir
         self.save_rgb = save_rgb
@@ -24,6 +24,7 @@ class L515DataInterface:
         self.depth_type = depth_type
         self.pcd_with_color = pcd_with_color
         self.pcd_with_normals = pcd_with_normals
+        self.crop_arm = crop_arm
         self.dist_thresh = dist_thresh
 
     def save_rgbs(self,):
@@ -69,13 +70,26 @@ class L515DataInterface:
             xyz_resh = xyz.reshape(-1, 3)
             xyz_color_resh = bgr[:, :, ::-1].reshape(-1, 3) 
 
+            # if self.pcd_bkgd_rm:
+            #     sel_inds, _ = self._pcd_bkgd_rm(pts=xyz_resh, dist_thresh=self.dist_thresh)
+            #     xyz_sel = xyz_resh[sel_inds]
+            #     clr_sel = xyz_color_resh[sel_inds]
+            # else:
+            #     xyz_sel = xyz_resh
+            #     clr_sel = xyz_color_resh
+
             if self.pcd_bkgd_rm:
-                sel_inds, _ = self._pcd_bkgd_rm(pts=xyz_resh, dist_thresh=self.dist_thresh)
-                xyz_sel = xyz_resh[sel_inds]
-                clr_sel = xyz_color_resh[sel_inds]
+                sel_inds_frgnd, _ = self._pcd_bkgd_rm(pts=xyz_resh, dist_thresh=self.dist_thresh)
             else:
-                xyz_sel = xyz_resh
-                clr_sel = xyz_color_resh
+                sel_inds_frgnd = np.ones(xyz_resh.shape[0])
+            
+            if self.crop_arm:
+                sel_inds_armless = self.get_armless_inds(img_pth=imp)
+            else:
+                sel_inds_armless = np.ones(xyz_resh.shape[0])
+
+            xyz_sel = xyz_resh[sel_inds_frgnd & sel_inds_armless]
+            clr_sel = xyz_color_resh[sel_inds_frgnd & sel_inds_armless]
             
             if self.pcd_with_color and self.pcd_with_normals:
                 if self.pcd_bkgd_rm:
@@ -180,11 +194,18 @@ class L515DataInterface:
         pts_sel = pts[sel_inds]
         
         return sel_inds, pts_sel
+    
+    def get_armless_inds(self, img_pth):
+        arm_mask_pth = img_pth.replace('pointcloud', 'armless_msk').replace('bgr.npz', 'png')
+        arm_mask = cv2.imread(arm_mask_pth)
 
-    def _compute_normals(self, pts, rad=0.05, maxnn=10):
+        return arm_mask[:, :, 0].flatten().astype(bool)
+
+    def _compute_normal1s(self, pts, rad=0.05, maxnn=10):
         pcd_o3d = o3d.geometry.PointCloud()
         pcd_o3d.points = o3d.pybind.utility.Vector3dVector(pts)
         pcd_o3d.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=rad, max_nn=maxnn))
+
         return np.array(pcd_o3d.normals)
     
     def __call__(self):
@@ -202,34 +223,34 @@ class L515DataInterface:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser("Processing captured raw data")
+    # parser = argparse.ArgumentParser("Processing captured raw data")
 
-    parser.add_argument('--inp_seq_dir', type=str, default='/tmp-network/user/aswamy/L515_seqs/20220614/20220614171547/pointcloud',
-                        help='path to the input data dir(dir with *.bgr.npz and *.xyz.npz')
-    parser.add_argument('--save_base_dir', type=str, default='/tmp-network/dataset/hand-obj',
-                        help='base path to save processed data')
-    parser.add_argument('--save_rgb', action='store_true',
-                        help='flag to save rgb image')    
-    parser.add_argument('--save_depth', action='store_true',
-                        help='flag to save depth')    
-    parser.add_argument('--save_pcd', action='store_true',
-                        help='flag to save only xyz')
-    parser.add_argument('--save_mask', action='store_true',
-                        help='flag to save foreground mask, need save_pcd and seg_pcd flags to be set')                        
-    parser.add_argument('--pcd_normals', action='store_true',
-                        help='flag to compute pcd normals')  
-    parser.add_argument('--pcd_color', action='store_true',
-                        help='flag to save pcd color')                        
-    parser.add_argument('--pcd_bkgd_rm', action='store_true',
-                        help='flag to segment foreground poincloud, needs save_pcd flag to be set')  
-    parser.add_argument('--depth_thresh', type=float, required=True,
-                        help='depth/dist threshold in (meters) to segment the foreground(hand+obj)')
-    parser.add_argument('--depth_type', type=str, default='dist_xyz',
-                        help='depth value choice; "dist_xyz":distance of pcd or "zaxis_val":z-axis val of pcd') 
+    # parser.add_argument('--inp_seq_dir', type=str, default='/tmp-network/user/aswamy/L515_seqs/20220614/20220614171547/pointcloud',
+    #                     help='path to the input data dir(dir with *.bgr.npz and *.xyz.npz')
+    # parser.add_argument('--save_base_dir', type=str, default='/tmp-network/dataset/hand-obj',
+    #                     help='base path to save processed data')
+    # parser.add_argument('--save_rgb', action='store_true',
+    #                     help='flag to save rgb image')    
+    # parser.add_argument('--save_depth', action='store_true',
+    #                     help='flag to save depth')    
+    # parser.add_argument('--save_pcd', action='store_true',
+    #                     help='flag to save only xyz')
+    # parser.add_argument('--save_mask', action='store_true',
+    #                     help='flag to save foreground mask, need save_pcd and seg_pcd flags to be set')                        
+    # parser.add_argument('--pcd_normals', action='store_true',
+    #                     help='flag to compute pcd normals')  
+    # parser.add_argument('--pcd_color', action='store_true',
+    #                     help='flag to save pcd color')                        
+    # parser.add_argument('--pcd_bkgd_rm', action='store_true',
+    #                     help='flag to segment foreground poincloud, needs save_pcd flag to be set')  
+    # parser.add_argument('--depth_thresh', type=float, required=True,
+    #                     help='depth/dist threshold in (meters) to segment the foreground(hand+obj)')
+    # parser.add_argument('--depth_type', type=str, default='dist_xyz',
+    #                     help='depth value choice; "dist_xyz":distance of pcd or "zaxis_val":z-axis val of pcd') 
 
-    args = parser.parse_args()
+    # args = parser.parse_args()
 
-    print("args:", args)     
+    # print("args:", args)     
 
     # create class instance
     # interface = L515DataInterface(
@@ -251,10 +272,11 @@ if __name__ == "__main__":
 
     # or run below lines for test
     interface = L515DataInterface(inp_seq_dir='/tmp-network/user/aswamy/L515_seqs/20220614/20220614171547',
-    save_base_dir='/tmp-network/dataset/hand-obj', save_rgb=True, save_depth=False,
-     save_mask=False, save_pcd=True, pcd_bkgd_rm=True, pcd_with_color=False,
+    save_base_dir='/tmp-network/user/aswamy/dataset/hand-obj', save_rgb=False, save_depth=False,
+     save_mask=False, save_pcd=True, pcd_bkgd_rm=True, pcd_with_color=True,
      pcd_with_normals=False, dist_thresh=0.8, depth_type='dist_xyz')
     # interface.save_rgbs() # for rgb
     # interface.save_pointclouds() # for pcd
-    interface() # for both rgb and pcds
+    # interface() # for both rgb and pcds
+    interface.save_pointclouds()
     print('Done!!')
