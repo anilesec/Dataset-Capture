@@ -339,6 +339,8 @@ if __name__ == "__main__":
     kms_num_clstrs=args.kms_num_clstrs)
     bb()
     interface.save_rgbs()
+    interface.save_masks()
+    bb()
     interface.save_slvless_masks() 
     interface.save_pointclouds()
     bb()

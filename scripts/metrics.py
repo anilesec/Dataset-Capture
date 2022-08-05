@@ -40,9 +40,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print("args:", args)     
 
-
-    tgt_pcd_pth = f'/scratch/github_repos/Fast-Robust-ICP/data/{args.sqn}//data_for_reg/tgt_pcd.ply'
-    all_algnd_pcds_pths = sorted(glob.glob(f'/scratch/github_repos/Fast-Robust-ICP/res/{args.sqn}//frm*/f_pcd.ply'))
+    ICP_DIR = '/home/aswamy/my_drive/github_repos/Fast-Robust-ICP'
+    tgt_pcd_pth = f'{ICP_DIR}/data/{args.sqn}//data_for_reg/tgt_pcd.ply'
+    all_algnd_pcds_pths = sorted(glob.glob(f'{ICP_DIR}/res/{args.sqn}/*/f_pcd.ply'))
 
     pcd_metrics = Metrics(tgt_pcd_pth, None, all_algnd_pcds_pths, None)
 
@@ -54,16 +54,15 @@ if __name__ == "__main__":
     all_frms_dist_mu = np.array(all_frms_dist_mu)
 
     # print stats
-    print(f'Mean: {all_frms_dist_mu.mean()}')
-    print(f'Min: {all_frms_dist_mu.min()}')
-    print(f'Max: {all_frms_dist_mu.max()}')
-    print(f'Std: {all_frms_dist_mu.std()}')
-    print(f'Percentile 25th: {np.percentile(all_frms_dist_mu, 25)}')
-    print(f'Percentile 25th: {np.percentile(all_frms_dist_mu, 50)}')
-    print(f'Percentile 25th: {np.percentile(all_frms_dist_mu, 75)}')
-    print(f'Percentile 25th: {np.percentile(all_frms_dist_mu, 90)}')
-    print(f'Percentile 25th: {np.percentile(all_frms_dist_mu, 95)}')
-
+    print(f'Mean: {np.round(all_frms_dist_mu.mean(), 5)}')
+    print(f'Min: {np.round(all_frms_dist_mu.min(), 5)}')
+    print(f'Max: {np.round(all_frms_dist_mu.max(), 5)}')
+    print(f'Std: {np.round(all_frms_dist_mu.std(), 5)}')
+    print(f'Percentile 25th: {np.round(np.percentile(all_frms_dist_mu, 25), 5)}')
+    print(f'Percentile 50th: {np.round(np.percentile(all_frms_dist_mu, 50), 5)}')
+    print(f'Percentile 75th: {np.round(np.percentile(all_frms_dist_mu, 75), 5)}')
+    print(f'Percentile 90th: {np.round(np.percentile(all_frms_dist_mu, 90), 5)}')
+    print(f'Percentile 95th: {np.round(np.percentile(all_frms_dist_mu, 95), 5)}')
     # plot
     plt.figure(figsize=(20, 10))
     plt.plot(all_frms_dist_mu, 'go-', markersize=1, linewidth=1)

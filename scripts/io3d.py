@@ -39,10 +39,10 @@ def _write_ply_point(fp, x,y,z, color=None, normal=None, binary=False):
         fp.write(struct.pack(fmt, *args))
     else:
         fmt = '%f %f %f'
-        if color is not None:
-            fmt = fmt + ' %d %d %d'
         if normal is not None:
             fmt = fmt + ' %f %f %f'
+        if color is not None:
+            fmt = fmt + ' %d %d %d'
         fmt += '\n'
         fp.write(fmt % tuple(args))
 

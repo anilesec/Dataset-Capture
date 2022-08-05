@@ -1,3 +1,10 @@
+import open3d as o3d
+from scripts.io3d import *
+import numpy as np
+import os, sys
+osp = os.path
+from ipdb import set_trace as bb
+
 if True:
     def initialize(curr_frm_pcd_pth, prev_frm_f_pth, curr_frm_init_pcd_write_pth):
         import open3d as o3d
@@ -44,29 +51,26 @@ if True:
 
 
 
-import open3d as o3d
-from scripts.io3d import *
-import numpy as np
-import os, sys
-osp = os.path
+ICP_DIR = '/home/aswamy/my_drive/github_repos/Fast-Robust-ICP'
+SEQ_NAME = '20220801143454'
+ICP_ENUM = 3
 
-for frm_idx in range(460, 900):
+for frm_idx in range(200, 202):
     print(f'frame_idx: {frm_idx}')
-    initialize(curr_frm_pcd_pth=f'/scratch/github_repos/Fast-Robust-ICP/data/20220705173214/data_for_reg/0000000{frm_idx}.ply',
-        prev_frm_f_pth=f'/scratch/github_repos/Fast-Robust-ICP/res/20220705173214/frm{frm_idx-1}/f_trans.txt',
-        curr_frm_init_pcd_write_pth=f'/scratch/github_repos/Fast-Robust-ICP/data/20220705173214/data_for_reg/init_0000000{frm_idx}.ply')
-    
-    base_dir = '/scratch/github_repos/Fast-Robust-ICP'
+    initialize(curr_frm_pcd_pth=f'{ICP_DIR}/data/{SEQ_NAME}/data_for_reg/0000000{frm_idx}.ply',
+        prev_frm_f_pth=f'{ICP_DIR}/res/{SEQ_NAME}/frm{frm_idx-1}/f_trans.txt',
+        curr_frm_init_pcd_write_pth=f'{ICP_DIR}/data/{SEQ_NAME}/data_for_reg/init_0000000{frm_idx}.ply')
+    bb()
     print('Running bash commands...')
-    print(f"{osp.join(base_dir, 'build/FRICP')} {osp.join(base_dir, 'data/20220705173214/data_for_reg/tgt_pcd.ply')} {osp.join(base_dir, f'data/20220705173214/data_for_reg/init_0000000{frm_idx}.ply')} {osp.join(base_dir, f'res/20220705173214/frm{frm_idx}/')} 3")
-    os.system(f"{osp.join(base_dir, 'build/FRICP')} {osp.join(base_dir, 'data/20220705173214/data_for_reg/tgt_pcd.ply')} {osp.join(base_dir, f'data/20220705173214/data_for_reg/init_0000000{frm_idx}.ply')} {osp.join(base_dir, f'res/20220705173214/frm{frm_idx}/')} 3")
-    # print(f"{osp.join(base_dir, 'build/FRICP')} {osp.join(base_dir, 'data_for_reg/tgt_pcd.ply')} {osp.join(base_dir, f'data/20220705173214/data_for_reg/init_0000000{frm_idx}.ply')}")
-
-    finalize(curr_frm_pcd_pth=f'/scratch/github_repos/Fast-Robust-ICP/data/20220705173214/data_for_reg/0000000{frm_idx}.ply',
-        curr_frm_o_pth=f'/scratch/github_repos/Fast-Robust-ICP/res/20220705173214/frm{frm_idx}/m3trans.txt', 
-        curr_frm_i_pth=f'/scratch/github_repos/Fast-Robust-ICP/res/20220705173214/frm{frm_idx-1}/f_trans.txt',
-        curr_frm_f_write_pth=f'/scratch/github_repos/Fast-Robust-ICP/res/20220705173214/frm{frm_idx}/f_trans.txt',
-        curr_frm_f_pcd_write_pth=f'/scratch/github_repos/Fast-Robust-ICP/res/20220705173214/frm{frm_idx}/f_pcd.ply')
+    print(f"{osp.join(ICP_DIR, 'build/FRICP')} {osp.join(ICP_DIR, f'data/{SEQ_NAME}/data_for_reg/tgt_pcd.ply')} {osp.join(ICP_DIR, f'data/{SEQ_NAME}/data_for_reg/init_0000000{frm_idx}.ply')} {osp.join(ICP_DIR, f'res/{SEQ_NAME}/frm{frm_idx}/')} {ICP_ENUM}")
+    os.system(f"{osp.join(ICP_DIR, 'build/FRICP')} {osp.join(ICP_DIR, f'data/{SEQ_NAME}/data_for_reg/tgt_pcd.ply')} {osp.join(ICP_DIR, f'data/{SEQ_NAME}/data_for_reg/init_0000000{frm_idx}.ply')} {osp.join(ICP_DIR, f'res/{SEQ_NAME}/frm{frm_idx}/')} {ICP_ENUM}")
+    
+    bb()
+    finalize(curr_frm_pcd_pth=f'{ICP_DIR}/data/{SEQ_NAME}/data_for_reg/0000000{frm_idx}.ply',
+        curr_frm_o_pth=f'{ICP_DIR}/res/{SEQ_NAME}/frm{frm_idx}/m3trans.txt', 
+        curr_frm_i_pth=f'{ICP_DIR}/res/{SEQ_NAME}/frm{frm_idx-1}/f_trans.txt',
+        curr_frm_f_write_pth=f'/{ICP_DIR}/res/{SEQ_NAME}/frm{frm_idx}/f_trans.txt',
+        curr_frm_f_pcd_write_pth=f'{ICP_DIR}/res/{SEQ_NAME}/frm{frm_idx}/f_pcd.ply')
 
 print('Done!')
 
