@@ -10,13 +10,16 @@ osp = os.path
 from io3d import *
 from sleeve_segm import getLargestCC, segm_sleeve
 
+
 def imgs2vid_ffmpeg(imgs_dir, file_pth, ext='png',  frm_rate=10):
     import os
     print(f"ffmpeg creating video...")
     cmd = f"ffmpeg -hide_banner -loglevel error -framerate {frm_rate} -pattern_type glob -i '{imgs_dir}/*.{ext}' -c:v " f"libx264 -vf fps=30 -pix_fmt yuv420p {file_pth} -y "
     os.system(cmd)
-   # os.system(f"rm {imgs_dir}/*.jpg")s
+    # os.system(f"rm {imgs_dir}/*.jpg")
+
     return print(f"video saved here: {file_pth}")
+
 
 class L515DataInterface:
     def __init__(self, inp_seq_dir, save_base_dir, save_rgb=False, save_depth=False,
@@ -182,7 +185,7 @@ class L515DataInterface:
         "save foreground masks"
         print('Saving masks...')
         start = time.time() 
-
+        # bb()
         mask_sdir = osp.join(self.save_base_dir, self._get_seq_name, 'mask')
         os.makedirs(mask_sdir, exist_ok=True)
 
@@ -210,8 +213,8 @@ class L515DataInterface:
             cv2.imwrite(fn_mask, mask_3ch)
 
         print('Done!')
-        print(f'RGB Save Time: {(time.time() - start):0.4f}s')
-        print(f"rgb save here: {mask_sdir}")
+        print(f'masks Save Time: {(time.time() - start):0.4f}s')
+        print(f"masks saved here: {mask_sdir}")
 
         return None
     
@@ -221,8 +224,10 @@ class L515DataInterface:
         start = time.time()
         rgbs_dir = osp.join(self.save_base_dir, self._get_seq_name, 'rgb')
         save_seq_dir = osp.join(self.save_base_dir, self._get_seq_name)
-        slvless_msk_dir = segm_sleeve(rgbs_dir,  save_seq_dir, self.slv_clr, self.start_ind, self.end_ind,
-                    self.norm_type, self.kms_max_iter, self.kms_eps, self.kms_num_clstrs)
+        fgnd_masks_dir = osp.join(self.save_base_dir, self._get_seq_name, 'mask')
+
+        slvless_msk_dir = segm_sleeve(rgbs_dir, fgnd_masks_dir, save_seq_dir, self.slv_clr, self.start_ind, self.end_ind,
+        self.norm_type, self.kms_max_iter, self.kms_eps, self.kms_num_clstrs)
         print('Done!')
         print(f'RGB Save Time: {(time.time() - start):0.4f}s')
         print(f"rgb save here: {slvless_msk_dir}")
@@ -302,9 +307,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser("Processing captured raw data")
 
-    parser.add_argument('--inp_seq_dir', type=str, default='/tmp-network/user/aswamy/L515_seqs/20220614/20220614171547',
+    parser.add_argument('--inp_seq_dir', type=str, required=True,
                         help='path to the input data dir(dir with *.bgr.npz and *.xyz.npz')
-    parser.add_argument('--save_base_dir', type=str, default='/gfs-ssd/dataset/hand-obj',
+    parser.add_argument('--save_base_dir', type=str, default='/scratch/1/user/data/hand-obj',
                         help='base path to save processed data')
     parser.add_argument('--start_ind', type=int, default=None,
                         help='start index of a seq')
@@ -326,9 +331,9 @@ if __name__ == "__main__":
 
     # sleeve segm parameters
     SLV_COLOR = [128, 204, 77] # normalization color of arm sleeve(observe the segmented image after clustering and then set this)
-    KMEANS_MAX_ITER = 100  # k-means max iteration criteria (increases computation time)
-    KMEANS_EPSILON = 0.2 # k-means accuracy criteria
-    KMEANS_NUM_CLUSTERS = 10 # k-means number of clusters
+    # KMEANS_MAX_ITER = 100  # k-means max iteration criteria (increases computation time)
+    # KMEANS_EPSILON = 0.2 # k-means accuracy criteria
+    # KMEANS_NUM_CLUSTERS = 4 # k-means number of clusters
     
     #run below lines for test
     interface = L515DataInterface(inp_seq_dir=args.inp_seq_dir, save_base_dir=args.save_base_dir,
