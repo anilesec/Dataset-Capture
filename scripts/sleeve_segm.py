@@ -26,17 +26,14 @@ def segm_sleeve(rgbs_dir, fgnd_masks_dir, save_rt_dir, slv_clr, start_ind, end_i
         #     continue
         # bb()
         fgnd_mskp = osp.join(fgnd_masks_dir, osp.basename(imp))
-        
         img = np.array(Image.open(imp))
         fgnd_msk = np.array(Image.open(fgnd_mskp))[:, :, 0]
-
         im = cv2.bitwise_and(img, img, mask=fgnd_msk)
 
-        # bb()
         # normalize image
         if norm_type == 'L2':
             im_norm = 255. * im / (np.linalg.norm(im, axis=-1)[:, :, None] + 1e-6)
-            iTHRESH = 50  # normalized intensity thresh (this should be adjusted for each seq/when ration is used instead of L2 normalization)
+            iTHRESH = 10  # normalized intensity thresh (this should be adjusted for each seq/when ratio is used instead of L2 normalization)
         else:
             im_norm = 255. * im / (np.sum(im,axis=-1)[:, :, None] + 1e-6)
             iTHRESH = 110  # normalized intensity thresh (this should be adjusted for each seq/when ration is used instead of L2 normalization)
@@ -49,12 +46,26 @@ def segm_sleeve(rgbs_dir, fgnd_masks_dir, save_rt_dir, slv_clr, start_ind, end_i
         centers = np.uint8(centers)
         segmented_image = centers[labels.flatten()]
         segmented_image = segmented_image.reshape(im.shape)
-        # bb()
+
+        counts = []
+        for ind in range(kmeans_num_clustrs):
+            counts.append(np.count_nonzero(labels==ind))
+
+        # slv_clr_ind = np.argsort(counts)[-2] #2nd maximum count pixel color/cluster color
+        slv_clr_ind = np.argmax(centers[:, 1])
+        slv_color_auto = centers[slv_clr_ind]
+        # cv2.imwrite('./segmented_image.png', segmented_image); slv_i = np.linalg.norm(segmented_image - np.array(slv_color_auto)[None, None], axis=-1).astype(np.uint8); cv2.imwrite('./slv_i.png', slv_i)
         # cv2.imwrite('./segmented_image.png', segmented_image); slv_i = np.linalg.norm(segmented_image - np.array(slv_clr)[None, None], axis=-1).astype(np.uint8); cv2.imwrite('./slv_i.png', slv_i)
+        # bb()  
+        
         # slv_i = np.linalg.norm(segmented_image - np.array(slv_clr)[None, None], axis=-1).astype(np.uint8)
         # cv2.imwrite('./slv_i.png', slv_i)
 
-        slv = np.linalg.norm(segmented_image - np.array(slv_clr)[None, None], axis=-1) < iTHRESH
+        # slv = np.linalg.norm(segmented_image - np.array(slv_clr)[None, None], axis=-1) < iTHRESH
+        slv = np.linalg.norm(segmented_image - np.array(slv_color_auto)[None, None], axis=-1) < iTHRESH
+        # slv1 = np.linalg.norm(segmented_image - np.array(slv_clr)[None, None], axis=-1) < 0.45*255
+        # slv2 = np.linalg.norm(segmented_image - np.array(slv_clr)[None, None], axis=-1) > 0.35*255
+        # slv = np.logical_and(slv1, slv2)
         
         # Remove small components after small hole filling
         # slv = binary_erosion(binary_dilation((binary_dilation(binary_dilation(slv)))))
@@ -130,10 +141,10 @@ if __name__ == "__main__":
     print("args:", args)  
     
     # parameters
-    SLV_COLOR =  [154, 185, 74]#[159, 185, 70] # normalized color of arm sleeve
+    SLV_COLOR =  [144, 195, 69]#[159, 185, 70] # normalized color of arm sleeve
     KMEANS_MAX_ITER = 100  # k-means max iteration criteria (increases computation time)
     KMEANS_EPSILON = 0.2 # k-means accuracy criteria
-    KMEANS_NUM_CLUSTERS = 10 # k-means number of clusters
+    KMEANS_NUM_CLUSTERS = 4 # k-means number of clusters
     segm_sleeve(rgbs_dir=args.rgbs_dir, fgnd_masks_dir=args.fgnd_masks_dir, save_rt_dir=args.save_rt_dir, slv_clr=SLV_COLOR, start_ind=args.start_ind,
                 end_ind=args.end_ind, norm_type=args.norm_type, kmeans_max_iter=KMEANS_MAX_ITER,
                 kmeans_eps=KMEANS_EPSILON, kmeans_num_clustrs=KMEANS_NUM_CLUSTERS)
@@ -192,3 +203,4 @@ if __name__ == "__main__":
 
     print('Done!')
     """
+ 
