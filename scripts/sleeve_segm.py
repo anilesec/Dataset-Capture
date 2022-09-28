@@ -17,10 +17,10 @@ def getLargestCC(segmentation):
 
     return largestCC
 
-def segm_sleeve(rgbs_dir, fgnd_masks_dir, save_rt_dir, slv_clr, start_ind, end_ind, norm_type,
+def  segm_sleeve(rgbs_dir, fgnd_masks_dir, save_rt_dir, slv_clr, start_ind, end_ind, norm_type,
                 kmeans_max_iter=100, kmeans_eps=0.2, kmeans_num_clustrs=10):
     rgbs_pths = sorted(glob.glob(osp.join(rgbs_dir, '*.png')))
-
+    # bb()
     for idx, imp in tqdm(enumerate(rgbs_pths[start_ind: end_ind])):
         # if idx <= 123:
         #     continue
@@ -33,7 +33,7 @@ def segm_sleeve(rgbs_dir, fgnd_masks_dir, save_rt_dir, slv_clr, start_ind, end_i
         # normalize image
         if norm_type == 'L2':
             im_norm = 255. * im / (np.linalg.norm(im, axis=-1)[:, :, None] + 1e-6)
-            iTHRESH = 10  # normalized intensity thresh (this should be adjusted for each seq/when ratio is used instead of L2 normalization)
+            iTHRESH = 75  # normalized intensity thresh (this should be adjusted for each seq/when ratio is used instead of L2 normalization)
         else:
             im_norm = 255. * im / (np.sum(im,axis=-1)[:, :, None] + 1e-6)
             iTHRESH = 110  # normalized intensity thresh (this should be adjusted for each seq/when ration is used instead of L2 normalization)
@@ -52,11 +52,12 @@ def segm_sleeve(rgbs_dir, fgnd_masks_dir, save_rt_dir, slv_clr, start_ind, end_i
             counts.append(np.count_nonzero(labels==ind))
 
         # slv_clr_ind = np.argsort(counts)[-2] #2nd maximum count pixel color/cluster color
+        # slv_clr_ind = np.argsort(centers[:, 1])[-2] # 2nd max green clr value
         slv_clr_ind = np.argmax(centers[:, 1])
         slv_color_auto = centers[slv_clr_ind]
         # cv2.imwrite('./segmented_image.png', segmented_image); slv_i = np.linalg.norm(segmented_image - np.array(slv_color_auto)[None, None], axis=-1).astype(np.uint8); cv2.imwrite('./slv_i.png', slv_i)
         # cv2.imwrite('./segmented_image.png', segmented_image); slv_i = np.linalg.norm(segmented_image - np.array(slv_clr)[None, None], axis=-1).astype(np.uint8); cv2.imwrite('./slv_i.png', slv_i)
-        # bb()  
+        # bb()        
         
         # slv_i = np.linalg.norm(segmented_image - np.array(slv_clr)[None, None], axis=-1).astype(np.uint8)
         # cv2.imwrite('./slv_i.png', slv_i)
@@ -135,19 +136,21 @@ if __name__ == "__main__":
                         help='end index of the frame')
     parser.add_argument('--norm_type', type=str, default='L2',
                         help='norm coice; "L2" or "ratio"')
+    parser.add_argument('--kms_num_clstrs', type=int, default=4,
+                        help='k-means number of clusters')
     # parser.add_argument('--debug', type=int, default=0,
     #                     help='set to 1 for breakpoint') 
     args = parser.parse_args()
     print("args:", args)  
     
     # parameters
-    SLV_COLOR =  [144, 195, 69]#[159, 185, 70] # normalized color of arm sleeve
+    SLV_COLOR =  [144, 195, 69] #[159, 185, 70] # normalized color of arm sleeve
     KMEANS_MAX_ITER = 100  # k-means max iteration criteria (increases computation time)
     KMEANS_EPSILON = 0.2 # k-means accuracy criteria
-    KMEANS_NUM_CLUSTERS = 4 # k-means number of clusters
+    # KMEANS_NUM_CLUSTERS = 3 # k-means number of clusters
     segm_sleeve(rgbs_dir=args.rgbs_dir, fgnd_masks_dir=args.fgnd_masks_dir, save_rt_dir=args.save_rt_dir, slv_clr=SLV_COLOR, start_ind=args.start_ind,
                 end_ind=args.end_ind, norm_type=args.norm_type, kmeans_max_iter=KMEANS_MAX_ITER,
-                kmeans_eps=KMEANS_EPSILON, kmeans_num_clustrs=KMEANS_NUM_CLUSTERS)
+                kmeans_eps=KMEANS_EPSILON, kmeans_num_clustrs=args.kms_num_clstrs)
     print('Done!')
 
     """
