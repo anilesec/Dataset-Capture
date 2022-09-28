@@ -1,8 +1,7 @@
-from re import A
+
 import open3d as o3d
 import numpy as np
 import os, sys, glob
-import polyscope as ps
 from ipdb import set_trace as bb
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -97,16 +96,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print("args:", args)
 
-    ICP_DIR = '/home/aswamy/my_drive/github_repos/Fast-Robust-ICP'
+    ICP_DIR = '/scratch/1/user/aswamy/github_repos/Fast-Robust-ICP'
+    RES_DIR = '/scratch/1/user/aswamy/data/hand-obj/'
 
-    tgt_pcd_pth = f'{ICP_DIR}/data/{args.sqn}/data_for_reg/tgt_pcd.ply'
-    all_frms_poses_pths = sorted(glob.glob(f'{ICP_DIR}/res/{args.sqn}/*/f_trans.txt'))
+    tgt_pcd_pth = f'{RES_DIR}/{args.sqn}/gt_mesh/xyz/tgt_pcd.ply'
+    all_frms_poses_pths = sorted(glob.glob(f'{RES_DIR}/{args.sqn}/icp_res/*/f_trans.txt'))
     # bb()
-    imgs_dir = f'/home/aswamy/server_mounts/gfs-ssd/user/aswamy/dataset/hand-obj/{args.sqn}/rgb'
+    imgs_dir = f'{RES_DIR}/{args.sqn}/rgb'
     assert Path(imgs_dir).is_dir(), f"rgb dir does not exist {imgs_dir}" 
 
     # save_dir = f'/home/aswamy/server_mounts/gfs-ssd/user/aswamy/dataset/hand-obj/{args.sqn}/proj'
-    save_dir = f'/home/aswamy/my_drive/data/dataset/hand-obj/{args.sqn}/proj'
+    save_dir = f'{RES_DIR}/{args.sqn}/proj'
 
     intrinsics = np.array(
             [[899.783,   0.   , 653.768],
