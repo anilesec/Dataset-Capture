@@ -1,7 +1,7 @@
 import open3d as o3d
 import numpy as np
 import os, sys, glob
-import polyscope as ps
+# import polyscope as ps
 from ipdb import set_trace as bb
 from tqdm import tqdm
 import matplotlib.pyplot as plt
@@ -40,10 +40,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print("args:", args)     
 
-    ICP_DIR = '/home/aswamy/my_drive/github_repos/Fast-Robust-ICP'
-    tgt_pcd_pth = f'{ICP_DIR}/data/{args.sqn}//data_for_reg/tgt_pcd.ply'
-    all_algnd_pcds_pths = sorted(glob.glob(f'{ICP_DIR}/res/{args.sqn}/*/f_pcd.ply'))
-
+    ICP_DIR = '/scratch/1/user/aswamy/github_repos/Fast-Robust-ICP'
+    RES_DIR = '/scratch/1/user/aswamy/data/hand-obj'
+    tgt_pcd_pth = f'{ICP_DIR}/data/{args.sqn}/data_for_reg/tgt_pcd.ply'
+    all_algnd_pcds_pths = sorted(glob.glob(f'{RES_DIR}/{args.sqn}/icp_res/*/f_pcd.ply'))
+    # bb()
     pcd_metrics = Metrics(tgt_pcd_pth, None, all_algnd_pcds_pths, None)
 
     res_dicts = pcd_metrics.compute_allsrcs2tgt_metrics()
@@ -69,8 +70,8 @@ if __name__ == "__main__":
     plt.xlabel('Frame No.')
     plt.ylabel('Lidar to GT dist(m)')
     plt.title('Distance error of each frame')
-    plt.savefig(f'imgs/dist_err_{args.sqn}.png')
-    bb()
+    plt.savefig(f'/gfs-ssd/user/aswamy/github_repos/Dataset-Capture/imgs/dist_err_{args.sqn}.png')
+    # bb()
     print('Done!')
 
 
