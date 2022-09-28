@@ -1,6 +1,4 @@
 from copy import deepcopy
-from curses import raw
-from email.mime import base
 from xml.etree.ElementTree import TreeBuilder
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,7 +9,7 @@ from tqdm import tqdm
 import ipdb
 bb = ipdb.set_trace
 import cv2
-import open3d as o3d
+# import open3d as o3d
 
 def imgs2vid_ffmpeg(imgs_dir, file_pth, ext='png',  frm_rate=10):
     import os
@@ -52,31 +50,43 @@ def write_o3d_pcd(file_path, pcd_o3d):
 
 # Convert Midas depth into masks 
 if False:
-    base_dir = '/Users/aswamy/My_drive/github_repos/MiDaS/output/'
-    imgs_dir = '/Users/aswamy/My_drive/github_repos/MiDaS/output/dpt_large'
-    dimgs_dir = '/Users/aswamy/My_drive/github_repos/MiDaS/output/dpt_large'
-    dimgs_pths = sorted(glob.glob(osp.join(dimgs_dir, '*.png')))
-    imgs_pths = sorted(glob.glob(osp.join(dimgs_dir, '*.jpeg')))
-    for ithresh in np.linspace(0.1, 0.6, 6):
-        for dimp, imp in tqdm(zip(dimgs_pths, imgs_pths)):
-            # get mask
-            dimg = plt.imread(dimp)
-            mask = (dimg > ithresh).astype(np.uint8)
-            save_dir = osp.join(base_dir, f'{osp.basename(dimgs_dir)}_masks_th_{ithresh:.1f}')
-            fname_mask = osp.join(save_dir, osp.basename(dimp))
-            os.makedirs(osp.dirname(fname_mask), exist_ok=True)
-            plt.imsave(fname_mask, mask)
+    if __name__ == "__main__":
+        import argparse
 
-            # get masked image
-            img = plt.imread(imp)
-            mskd_img = cv2.bitwise_and(img, img, mask=mask.astype(np.uint8))
-            save_dir = osp.join(base_dir, f'{osp.basename(dimgs_dir)}_masks_th_{ithresh:.1f}_mskd_img')
-            fname_mskd_img = osp.join(save_dir, osp.basename(imp))
-            os.makedirs(osp.dirname(fname_mskd_img), exist_ok=True)
-            plt.imsave(fname_mskd_img, mskd_img)
+        parser = argparse.ArgumentParser("")
+        parser.add_argument('--sqn', type=str, required=True,
+                            help='seq name')
+
+        args = parser.parse_args()
+
+        print("args:", args)
+        seq = args.sqn
+        base_dir = f'/scratch/1/user/aswamy/data/hand-obj/{seq}'
+        imgs_dir = f'/scratch/1/user/aswamy/data/hand-obj/{seq}/rgb'
+        dimgs_dir = f'/scratch/1/user/aswamy/data/hand-obj/{seq}/midas_depth'
+        dimgs_pths = sorted(glob.glob(osp.join(dimgs_dir, '*.png')))
+        imgs_pths = sorted(glob.glob(osp.join(imgs_dir, '*.png')))
+        for ithresh in np.linspace(0.1, 0.6, 6):
+            for dimp, imp in tqdm(zip(dimgs_pths, imgs_pths)):
+                # get mask
+                dimg = plt.imread(dimp)
+                mask = (dimg > ithresh).astype(np.uint8)
+                save_dir = osp.join(base_dir, f'{osp.basename(dimgs_dir)}_masks_th_{ithresh:.1f}')
+                fname_mask = osp.join(save_dir, osp.basename(dimp))
+                os.makedirs(osp.dirname(fname_mask), exist_ok=True)
+                plt.imsave(fname_mask, mask)
+
+                # get masked image
+                img = plt.imread(imp)
+                mskd_img = cv2.bitwise_and(img, img, mask=mask.astype(np.uint8))
+                save_dir = osp.join(base_dir, f'{osp.basename(dimgs_dir)}_masks_th_{ithresh:.1f}_mskd_img')
+                fname_mskd_img = osp.join(save_dir, osp.basename(imp))
+                os.makedirs(osp.dirname(fname_mskd_img), exist_ok=True)
+                plt.imsave(fname_mskd_img, mskd_img)
+                # bb()
 
 # Convert RGBD data to colored pcds(.ply) 
-if False    :
+if False:
     # get colored pointclouds from RGB and depth info
     base_dir = '/Users/aswamy/My_drive/github_repos/jerome-yves/20220608165458_green_duster/pointcloud'
     imgs_dir =  '/Users/aswamy/My_drive/github_repos/jerome-yves/20220608165458_green_duster/pointcloud'
@@ -119,6 +129,50 @@ if False    :
             print(fname)
             o3d.io.write_point_cloud(fname, pcd_o3d, write_ascii=True)
     print('Done!!')
+
+
+# select the largest companent and writing it back
+if True:
+    if __name__ == "__main__":
+        import argparse
+
+        parser = argparse.ArgumentParser("")
+        parser.add_argument('--sqn', type=str, required=True,
+                            help='seq name')
+
+        parser.add_argument('--start_ind', type=int, default=None,
+                        help='start index of a seq')
+        parser.add_argument('--end_ind', type=int, default=None,
+                        help='End index of a seq')
+
+        args = parser.parse_args()
+
+        def getLargestCC(segmentation):
+            from skimage.measure import label   
+            "get largest connected components"
+            labels = label(segmentation)
+            assert( labels.max() != 0 ) # assume at least 1 CC
+            largestCC = labels == np.argmax(np.bincount(labels.flat)[1:]) + 1
+
+            return largestCC
+
+        imgs_pths = sorted(glob.glob(f'/scratch/1/user/aswamy/data/hand-obj/{args.sqn}/slvless_img/*.png'))
+
+        for imp in tqdm(imgs_pths[args.start_ind : args.end_ind]):
+            im = cv2.imread(imp)
+            im_norm = 255. * im / (np.sum(im,axis=-1)[:, :, None] + 1e-6)
+            im_mask = (im_norm.sum(2) > 0.0).astype(np.uint8)
+            # bb()
+            lcc = getLargestCC(im_mask)
+            im_lcc = cv2.bitwise_and(im, im, mask=lcc.astype(np.uint8))
+            cv2.imwrite(imp, im_lcc)
+            # bb()
+
+
+
+
+            
+
 
 # Segmenting hand pcds from background pcds
 if False:
