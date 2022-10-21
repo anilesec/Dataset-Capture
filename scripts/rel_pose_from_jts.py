@@ -67,40 +67,54 @@ def compute_root2cam_ops(all_jts2d, all_jts3d):
     
     return all_r2c_trnsfms, all_jts3d_cam
 
-def disp_rot_err(all_rot_err):
+def filter_jts(all_jts, window=5):
+    N = len(all_jts)
+
+    all_jts_fltrd = np.zeros(all_jts.shape)
+    for idx, jts in enumerate(all_jts):
+        if (idx < window) or (idx > N - window):
+            all_jts_fltrd[idx] = all_jts[idx]
+        else:
+            all_jts_fltrd[idx] = np.median(all_jts[idx - window : idx + window], axis=0)
+        
+    return np.array(all_jts_fltrd)
+
+def disp_rot_err(all_rot_err, just_mean=None):
     print("==============================================================================================")
     print(f"\nRotmat Error/distance between ref-rel of ann jts3d and ref-rel dope jts3d in cam spaces")
     print(f"Mean: {np.mean(all_rot_err):04f} °")
-    print(f"Median: {np.median(all_rot_err):04f} °")
-    print(f"Std: {np.std(all_rot_err):04f} °")
-    print(f"Min: {np.min(all_rot_err):04f} °")
-    print(f"Max: {np.max(all_rot_err):04f} °")
+    if just_mean is None:
+        print(f"Median: {np.median(all_rot_err):04f} °")
+        print(f"Std: {np.std(all_rot_err):04f} °")
+        print(f"Min: {np.min(all_rot_err):04f} °")
+        print(f"Max: {np.max(all_rot_err):04f} °")
 
-    all_rot_err_prcntls = np.percentile(all_rot_err, [25, 50, 75, 90])
+        all_rot_err_prcntls = np.percentile(all_rot_err, [25, 50, 75, 90])
 
-    print(f"Percentiles - 25th: {all_rot_err_prcntls[0]:04f} °")
-    print(f"Percentiles - 50th: {all_rot_err_prcntls[1]:04f} °")
-    print(f"Percentiles - 75th: {all_rot_err_prcntls[2]:04f} °")
-    print(f"Percentiles - 90th: {all_rot_err_prcntls[3]:04f} °")
+        print(f"Percentiles - 25th: {all_rot_err_prcntls[0]:04f} °")
+        print(f"Percentiles - 50th: {all_rot_err_prcntls[1]:04f} °")
+        print(f"Percentiles - 75th: {all_rot_err_prcntls[2]:04f} °")
+        print(f"Percentiles - 90th: {all_rot_err_prcntls[3]:04f} °")
     print("==============================================================================================")
 
     return None
 
-def disp_tran_err(all_tran_err):
+def disp_tran_err(all_tran_err, just_mean=None):
     print("==============================================================================================")
     print(f"\nTranslation Error/distance between ref-rel of ann jts3d and ref-rel dope jts3d in cam spaces")
     print(f"Mean: {np.mean(all_tran_err):04f} m") 
-    print(f"Median: {np.median(all_tran_err):04f} m")
-    print(f"Std: {np.std(all_tran_err):04f} m")
-    print(f"Min: {np.min(all_tran_err):04f} m")
-    print(f"Max: {np.max(all_tran_err):04f} m")
+    if just_mean is None:
+        print(f"Median: {np.median(all_tran_err):04f} m")
+        print(f"Std: {np.std(all_tran_err):04f} m")
+        print(f"Min: {np.min(all_tran_err):04f} m")
+        print(f"Max: {np.max(all_tran_err):04f} m")
 
-    all_tran_err_prcntls = np.percentile(all_tran_err, [25, 50, 75, 90])
+        all_tran_err_prcntls = np.percentile(all_tran_err, [25, 50, 75, 90])
 
-    print(f"Percentile - 25th: {all_tran_err_prcntls[0]:04f} m")
-    print(f"Percentile - 50th: {all_tran_err_prcntls[1]:04f} m")
-    print(f"Percentile - 75th: {all_tran_err_prcntls[2]:04f} m")
-    print(f"Percentile - 90th: {all_tran_err_prcntls[3]:04f} m")
+        print(f"Percentile - 25th: {all_tran_err_prcntls[0]:04f} m")
+        print(f"Percentile - 50th: {all_tran_err_prcntls[1]:04f} m")
+        print(f"Percentile - 75th: {all_tran_err_prcntls[2]:04f} m")
+        print(f"Percentile - 90th: {all_tran_err_prcntls[3]:04f} m")
     print("==============================================================================================")
 
     return None
@@ -108,10 +122,14 @@ def disp_tran_err(all_tran_err):
 if __name__ == "__main__":
     print("compute relative poses")
     parser = argparse.ArgumentParser('compute relative poses')
-    parser.add_argument('--sqn', type=str, default=None, help='seq id')
-    # parser.add_argument('--bsln_method', type=str, required=True,
-    #                     help='baseline method like DOPE, FRANKMOCAP, etc. ')
-    parser.add_argument('--add_noise', type=int, default=0, help='add(1) noise or not(0) to ann 3d jts')
+    parser.add_argument('--sqn', type=str, default=None,
+                        help='seq id')
+    parser.add_argument('--bsln', type=str, required=True,
+                        help='baseline method like DOPE, FRANKMOCAP, etc. ')
+    parser.add_argument('--add_noise', type=int, default=0,
+                        help='add(1) noise or not(0) to ann 3d jts')
+    parser.add_argument('--filter', type=int, default=0, choices=[0, 1],
+                        help='filter(1), not_filter(0)')
 
     args = parser.parse_args()
 
@@ -132,12 +150,21 @@ if __name__ == "__main__":
             # load ann 2d and 3d jts
             print('Loading annotation 2d & 3d jts...')
             sqn_dir = osp.join(RES_DIR, args.sqn)
-            all_jts2d, all_jts3d = load_ann_jts(sqn_dir)
+            all_jts2d_ann, all_jts3d_ann = load_ann_jts(sqn_dir)
 
             # add gaus noise
             if args.add_noise:
-                noise = np.random.normal(loc=0., scale=0.005, size=all_jts3d.shape)
-                all_jts3d = all_jts3d + noise
+                noise = np.random.normal(loc=0., scale=0.005, size=all_jts3d_ann.shape)
+                all_jts3d_ann = all_jts3d_ann + noise
+
+            if args.bsln == 'DOPE':
+                dets_pkls_dir = osp.join(RES_DIR, args.sqn, 'dope_dets')
+                all_jts2d, all_jts3d = load_dope_poses(dets_pkls_dir)
+
+                # median filtering the dope joints
+                if args.filter:
+                    all_jts2d = filter_jts(all_jts2d, window=5)
+                    all_jts3d = filter_jts(all_jts3d, window=5)
 
             all_r2c_trnsfms, all_jts3d_cam = compute_root2cam_ops(all_jts2d, all_jts3d)
 
@@ -151,7 +178,7 @@ if __name__ == "__main__":
                     [all_poses_ann[idx] @ np.linalg.inv(all_poses_ann[0])
                     for idx in range(1, len(all_poses_ann))]
                     )
-                all_poses_ann_prcst_rel, all_jts3d_ann_prcst_algnd = compute_relp_cam_from_jts3d(all_jts3d, rel_type='REF')
+                all_poses_ann_prcst_rel, all_jts3d_ann_prcst_algnd = compute_relp_cam_from_jts3d(all_jts3d_ann, rel_type='REF')
             
             ## Relative rotation erorr
             # using rel-pose obtained from ann poses
@@ -167,9 +194,9 @@ if __name__ == "__main__":
             
             # print rot err
             print("all_jts3d_prcrst_pose_rel_rot_err:")
-            _ = disp_rot_err(all_jts3d_prcrst_pose_rel_rot_err)
+            _ = disp_rot_err(all_jts3d_prcrst_pose_rel_rot_err, just_mean=True)
             print("all_rel_rot_err:")
-            _ = disp_rot_err(all_rel_rot_err)
+            _ = disp_rot_err(all_rel_rot_err, just_mean=True)
             
             ## Relative translation error
             # using rel-pose obtained from ann poses
@@ -179,12 +206,12 @@ if __name__ == "__main__":
 
             # print tran err
             print("all_jts3d_prcrst_pose_rel_tran_err:")
-            _ = disp_tran_err(all_jts3d_prcrst_pose_rel_tran_err)
+            _ = disp_tran_err(all_jts3d_prcrst_pose_rel_tran_err, just_mean=True)
             print("all_rel_tran_err:")
-            _ = disp_tran_err(all_rel_tran_err)
+            _ = disp_tran_err(all_rel_tran_err, just_mean=True)
             
 
-            bb()
+            # bb()
             if False:
                 # plot ann pose hand centers and r2c pose hand centers
                 all_jts3d_prcrst_pose_rel_tran = all_jts3d_prcrst_pose_rel[:, :3, 3]
@@ -217,8 +244,8 @@ if __name__ == "__main__":
                 all_inp_imgs = np.array(
                     [cv2.imread(imp)[:, :, ::-1] for imp in tqdm(all_imgs_pths)]
                 )
-                save_pth = os.path.join('./out/vid_ann_noise_4mm.mp4')
-                create_juxt_vid(filepath=save_pth, inp_imgs=all_inp_imgs, jts_order='OURS',
+                save_pth = os.path.join('./out/vid_dope_fltr{args.filter}_{args.sqn}.mp4')
+                create_juxt_vid(filepath=save_pth, inp_imgs=all_inp_imgs, jts_order='DOPE',
                             all_2d_jts=all_jts2d, all_3d_jts_rt=all_jts3d,
                             all_3d_jts_cam=all_jts3d_cam, all_3d_jts_prcst_algnd=None)
 
