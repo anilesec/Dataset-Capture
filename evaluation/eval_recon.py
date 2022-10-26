@@ -1,5 +1,7 @@
 # adapted from https://github.com/cvg/nice-slam
+from dis import dis
 import random, os
+from xmlrpc.client import Unmarshaller
 import numpy as np
 import argparse
 import torch
@@ -10,8 +12,10 @@ from ipdb import set_trace as bb
 import pickle
 import torch    
 osp = os.path
+from tqdm import tqdm
+import pprint
 
-def save_pkl(data, path):
+def saveas_pkl(data, path):
     with open(path, 'wb') as f:
         pickle.dump(data, f)
 
@@ -28,7 +32,7 @@ def viewmatrix(z, up, pos):
     return m
 
 
-def completion_ratio(gt_points, rec_points, dist_th=0.005):
+def completion_ratio(gt_points, rec_points, dist_th):
     gen_points_kd_tree = KDTree(rec_points)
     distances, _ = gen_points_kd_tree.query(gt_points)
     comp_ratio = np.mean((distances < dist_th).astype(np.float))
@@ -113,7 +117,7 @@ def nn_correspondance(verts1, verts2):
     return distances, indices
 
 
-def calc_3d_metric(rec_meshfile, gt_meshfile, align=False, sample_num=100000, save_pkl=None):
+def calc_3d_metric(rec_meshfile, gt_meshfile, align=False, sampl_num=100000, dist_thresh=None, save_pkl=None):
     """
     3D reconstruction metric.
 
@@ -142,24 +146,24 @@ def calc_3d_metric(rec_meshfile, gt_meshfile, align=False, sample_num=100000, sa
     mesh_rec.update_vertices(mask)
     mesh_rec.update_faces(face_mask)
     # bb()
-    rec_pc = trimesh.sample.sample_surface(mesh_rec, sample_num)
+    rec_pc = trimesh.sample.sample_surface(mesh_rec, sampl_num)
     rec_pc_tri = trimesh.PointCloud(vertices=rec_pc[0])
 
-    gt_pc = trimesh.sample.sample_surface(mesh_gt, sample_num)
+    gt_pc = trimesh.sample.sample_surface(mesh_gt, sampl_num)
     gt_pc_tri = trimesh.PointCloud(vertices=gt_pc[0])
     # ch_dist = chamf_dist(np.array(gt_pc_tri.vertices)[: int(sample_num / 10)], np.array(rec_pc_tri.vertices)[:int(sample_num / 10)])
     accuracy_rec, dist_d2s = accuracy(gt_pc_tri.vertices, rec_pc_tri.vertices)
     completion_rec, dist_s2d = completion(gt_pc_tri.vertices, rec_pc_tri.vertices)
     completion_ratio_rec = completion_ratio(
-        gt_pc_tri.vertices, rec_pc_tri.vertices)
+        gt_pc_tri.vertices, rec_pc_tri.vertices, dist_thresh)
     
     precision_ratio_rec = completion_ratio(
-        rec_pc_tri.vertices, gt_pc_tri.vertices)
+        rec_pc_tri.vertices, gt_pc_tri.vertices, dist_thresh)
     
     fscore = 2 * precision_ratio_rec * completion_ratio_rec / (completion_ratio_rec + precision_ratio_rec)
     
     # normal consistency
-    N = sample_num
+    N = sampl_num
     pointcloud_pred, idx = mesh_rec.sample(N, return_index=True)
     pointcloud_pred = pointcloud_pred.astype(np.float32)
     normal_pred = mesh_rec.face_normals[idx]
@@ -187,7 +191,8 @@ def calc_3d_metric(rec_meshfile, gt_meshfile, align=False, sample_num=100000, sa
     tosave_dict = dict()
     tosave_dict =  {
             'accuracy_rec' : accuracy_rec,
-            'completion_rec' :  precision_ratio_rec,
+            'completion_rec' :  completion_rec,
+            'precision_ratio_rec' :precision_ratio_rec,
             'completion_ratio_rec' : completion_ratio_rec,
             'fscore' : fscore,
             'normal_acc' : normal_comp,
@@ -195,10 +200,10 @@ def calc_3d_metric(rec_meshfile, gt_meshfile, align=False, sample_num=100000, sa
             # 'ch_dist': ch_dist
     }
 
-    print(f'Evalutaion in cms and %: {tosave_dict}')
+    pprint.pprint(f'Evalutaion in cms and %: {tosave_dict}')
     if save_pkl:
-        pkl_save_pth = osp.join(osp.dirname(osp.dirname(rec_meshfile)), 'recon_eval.pkl') 
-        save_pkl(pkl_save_pth, tosave_dict)
+        pkl_save_pth = osp.join(osp.dirname(osp.dirname(rec_meshfile)), f'recon_eval_sample{sampl_num}_dth_{dist_thresh}.pkl') 
+        saveas_pkl(tosave_dict, pkl_save_pth)
         print(f'saved here: {pkl_save_pth}')
 
     # print(accuracy_rec, completion_rec, precision_ratio_rec, completion_ratio_rec, fscore, normal_acc, normal_comp, normal_avg)
@@ -210,13 +215,13 @@ def calc_3d_metric(rec_meshfile, gt_meshfile, align=False, sample_num=100000, sa
         #data_color = R * data_alpha + W * (1-data_alpha)
         im_gray = (data_alpha * 255).astype(np.uint8)
         data_color = cv2.applyColorMap(im_gray, cv2.COLORMAP_JET)[:,0,[2, 0, 1]] / 255.
-        write_vis_pcd(f'{rec_meshfile}_d2s.ply', rec_pc_tri.vertices, data_color)
+        write_vis_pcd(f'{rec_meshfile}_d2s_sampl{sampl_num}_dth{dist_thresh}.ply', rec_pc_tri.vertices, data_color)
 
         stl_alpha = (dist_s2d.clip(max=vis_dist) / vis_dist).reshape(-1, 1)
         #stl_color = R * stl_alpha + W * (1-stl_alpha)
         im_gray = (stl_alpha * 255).astype(np.uint8)
         stl_color = cv2.applyColorMap(im_gray, cv2.COLORMAP_JET)[:,0,[2, 0, 1]] / 255.
-        write_vis_pcd(f'{rec_meshfile}_s2d.ply', gt_pc_tri.vertices, stl_color)
+        write_vis_pcd(f'{rec_meshfile}_s2d_sampl{sampl_num}_dth{dist_thresh}.ply', gt_pc_tri.vertices, stl_color)
 
 
 def chamf_dist(gt_pts, rec_pts):
@@ -335,8 +340,13 @@ if __name__ == '__main__':
                         help='viz the errors on pcds')
     parser.add_argument('--save', type=str, default=0, 
                         help='save or not')
+    parser.add_argument('--sampl_num', type=int, default=200000, 
+                        help='no of pts to sampel on surface')
     args = parser.parse_args()
 
     print('Reconstruction evaluation execution...')
-    calc_3d_metric(args.rec_mesh, args.gt_mesh, sample_num=100000, save_pkl=args.save)
-    # calc_2d_metric(args.rec_mesh, args.gt_mesh, n_imgs=10)
+    for dth in tqdm(np.linspace(0.001, 0.015, 15)):
+        print(f'dist_thresh = {dth}')
+        calc_3d_metric(args.rec_mesh, args.gt_mesh, sampl_num=args.sampl_num, dist_thresh=dth, save_pkl=args.save)
+    print('Done!')
+    
