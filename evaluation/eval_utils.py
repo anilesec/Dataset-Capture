@@ -12,8 +12,14 @@ CAM_INTR = np.array(
             [  0.   , 900.019, 362.143],
             [  0.   ,   0.   ,   1.   ]])
 
+def ours2hocnet(**kwargs):
+    return np.array([0, 1, 6, 11, 16, 2, 7, 12, 17, 3, 8, 13, 18, 4, 9, 14, 19, 5, 10, 15, 20])
+
+def ours2dope(**kwargs):
+    return np.array([0, 1, 2, 3, 4, 5, 6, 11, 16, 7, 12, 17, 8, 13, 18, 9, 14, 19, 10, 15, 20])
+
+
 def load_pkl(pkl_file):
-    assert pkl_file.endswith(".pkl")
     with open(pkl_file, 'rb') as in_f:
         try:
             data = pickle.load(in_f)
@@ -106,9 +112,13 @@ def trnsfm_points(trnsfm, pts):
 
 trnsfm2homat = lambda t: np.vstack((t, [0., 0., 0., 1.]))
 
-def load_ann_jts(sqn_dir):
-    all_j2d_pths = sorted(glob.glob(osp.join(sqn_dir, 'proj_jts/*.txt')))
-    all_j3d_pths = sorted(glob.glob(osp.join(sqn_dir, 'jts3d/*.txt')))
+def load_ann_jts(sqn_dir, disp=None):
+    if disp == True:
+        all_j2d_pths = sorted(glob.glob(osp.join(sqn_dir, 'proj_jts_disp/*.txt')))
+        all_j3d_pths = sorted(glob.glob(osp.join(sqn_dir, 'jts3d_disp/*.txt')))
+    else:
+        all_j2d_pths = sorted(glob.glob(osp.join(sqn_dir, 'proj_jts/*.txt')))
+        all_j3d_pths = sorted(glob.glob(osp.join(sqn_dir, 'jts3d/*.txt')))
 
     all_j2d = []
     all_j3d = []
@@ -133,7 +143,7 @@ def load_poses3d_ann(seq_pose3d_ann_dir):
     return np.array(all_poses_hom)
 
 
-def compute_similarity_transform_v2(S1, S2, return_transfom=False, mu_idx=None, scale=None):
+def compute_similarity_transform(S1, S2, return_transfom=False, mu_idx=None, scale=None):
     """
     Computes a similarity transform (sR, t) that takes
     a set of 3D points S1 (3 x N) closest to a set of 3D points S2,
@@ -196,3 +206,31 @@ def compute_similarity_transform_v2(S1, S2, return_transfom=False, mu_idx=None, 
         return S1_hat, tform
 
     return S1_hat
+
+
+def load_dope_det_frm_pkl(pkl_pth):
+    pkl_data = load_pkl(pkl_pth)
+    # consider only one-hand(RIGHT hand dets); this may needs to be changed in future
+    # for whichever hand has better detections. For now, its just RIGHT hand
+    dets = pkl_data['detections']
+    if len(dets) > 1:
+        if (dets[0]['hand_isright'] and dets[1]['hand_isright']) or \
+                (not dets[0]['hand_isright'] and not dets[1]['hand_isright']):
+            if dets[0]['score'] >= dets[1]['score']:
+                right_hand_id = 0
+            elif dets[0]['score'] < dets[1]['score']:
+                right_hand_id = 1
+            else:
+                raise ValueError("Error!! Agrrrr!! Check your inefficient conditional statements >_<")
+        elif dets[0]['hand_isright']:
+            right_hand_id = 0
+        elif dets[1]['hand_isright']:
+            right_hand_id = 1
+        else:
+            raise ValueError("Error!! Agrrrr!! Check your stupid conditional statements >_<")
+    else:
+        right_hand_id = 0
+    jts2d = (dets[right_hand_id]['pose2d'])
+    jts3d = (dets[right_hand_id]['pose3d'])
+
+    return jts2d, jts3d

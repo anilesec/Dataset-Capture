@@ -279,17 +279,18 @@ if __name__ == "__main__":
     all_MPJPE_PA = []
     missing_poses_frms = []
     for pklpth in tqdm(all_dope_pkls):
+        # bb()
         # check if pose/3D jts exist for corresponding dope det
-        jts3d_ann_pth = pathlib.Path(pklpth.replace('dope_dets', 'jts3d').replace('pkl', 'txt'))
+        jts3d_ann_pth = pathlib.Path(pklpth.replace('dope_dets', 'jts3d_disp').replace('pkl', 'txt'))
         if not jts3d_ann_pth.exists():
             print(f'Missing: {jts3d_ann_pth}')
             missing_poses_frms.append(jts3d_ann_pth)
             continue
         _, jts3d_dope = load_dope_det_frm_pkl(pklpth)
-        all_jts3d_dope.append(jts3d_dope)
+        # all_jts3d_dope.append(jts3d_dope)
 
         jts3d_ann = np.loadtxt(jts3d_ann_pth)
-        all_jts3d_ann.append(all_jts3d_ann)
+        # all_jts3d_ann.append(all_jts3d_ann)
         # bb()
         MPJPE, MPJPE_PA, _, _ = compute_errors(jts3d_dope.reshape(1, 21, 3), jts3d_ann[ours2dope()].reshape(1, 21, 3))
         all_MPJPE.append(MPJPE)

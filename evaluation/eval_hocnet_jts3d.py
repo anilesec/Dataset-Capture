@@ -136,6 +136,7 @@ def compute_errors(preds3d, gt3ds):
 
         # Compute MPJPE_PA and also store similiarity matrices to apply them later to rotation matrices for MPJAE_PA
         pred3d_sym, R = compute_similarity_transform(pred3d, gt3d)
+        # bb()
         pa_error = np.sqrt(np.sum((gt3d - pred3d_sym) ** 2, axis=1))
         errors_pa.append(np.mean(pa_error))
 
@@ -167,7 +168,7 @@ if __name__ == "__main__":
     missing_poses_frms = []
     for txtp in tqdm(all_hocnet_jts3d_txts):
         # check if GT 3D jts exist for corresponding hocnet det
-        jts3d_ann_pth = pathlib.Path(txtp.replace('jts3d_hocnet', 'jts3d'))
+        jts3d_ann_pth = pathlib.Path(txtp.replace('jts3d_hocnet', 'jts3d_disp'))
         if not jts3d_ann_pth.exists():
             print(f'Missing: {jts3d_ann_pth}')
             missing_poses_frms.append(jts3d_ann_pth)
