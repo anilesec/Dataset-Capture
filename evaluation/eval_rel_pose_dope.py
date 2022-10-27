@@ -1,3 +1,4 @@
+from evaluation.eval_recon import saveas_pkl
 import numpy as np
 import os, sys, glob
 from ipdb import set_trace as bb
@@ -21,6 +22,7 @@ RES_DIR = pathlib.Path('/scratch/1/user/aswamy/data/hand-obj')
 
 def compute_relp_cam_from_jts3d(all_jts3d_cam, rel_type=None):
     if rel_type == 'CONSEQ':
+        raise NotImplementedError
         print("CONSEQ-REL pose computation...")
         all_jts3d_prcrst_algnd = all_jts3d_cam[0].reshape(1, 21, 3)
         all_jts3d_prcrst_pose_rel = np.eye(4).reshape(1, 4, 4)
@@ -51,11 +53,11 @@ def compute_root2cam_ops(all_jts2d, all_jts3d):
     # pnp minimization
     all_r2c_trnsfms = cv2_PNPSolver(all_jts3d, all_jts2d, CAM_INTR)
 
-    projtd_jts2d = []
-    for r2c, j3d in zip(all_r2c_trnsfms, all_jts3d):
-        proj_mat = CAM_INTR @ r2c
-        projtd_jts2d.append(project(P=proj_mat, X=j3d))
-    print(f"Reproj Err: {np.mean(np.linalg.norm(all_jts2d - projtd_jts2d, axis=2), 1).mean()}")
+    # projtd_jts2d = []
+    # for r2c, j3d in zip(all_r2c_trnsfms, all_jts3d):
+    #     proj_mat = CAM_INTR @ r2c
+    #     projtd_jts2d.append(project(P=proj_mat, X=j3d))
+    # print(f"Reproj Err: {np.mean(np.linalg.norm(all_jts2d - projtd_jts2d, axis=2), 1).mean()}")
     
     # transform 3d points to cam transform using all_r2c_trnsfms
     all_jts3d_cam = np.array(
@@ -141,8 +143,9 @@ if __name__ == "__main__":
         assert args.sqn in all_sqns, f"{args.sqn} is not present in listed sequences!!!"
         all_sqns = [args.sqn]
 
+    all_seqs_mean_RRE = []
+    all_seqs_mean_RTE = []
 
-    all_missing_dets = dict()
     for sqn in all_sqns:
         print(f"sqn: {sqn}")
         
@@ -159,42 +162,7 @@ if __name__ == "__main__":
         all_poses_ann = []
 
         missing_dets_frms = []
-        """
-        
-        # for ann_posp in all_poses_ann_pths:
-        #     dope_pkl_pth = pathlib.Path((ann_posp.replace('icp_res', 'dope_dets')).replace('txt', 'pkl'))
-        #     if not dope_pkl_pth.exists():
-        #         print(f'Missing dope det: {dope_pkl_pth}')
-        #         missing_dets_frms.append(dope_pkl_pth) 
-        #         continue
-        #     jts2d_dope, jts3d_dope = load_dope_det_frm_pkl(dope_pkl_pth)
-        #     all_jts2d_dope.append(jts2d_dope)
-        #     all_jts3d_dope.append(jts3d_dope)
-            
-        #     j2d_ann_pth = pathlib.Path(ann_posp.replace('icp_res', 'proj_jts'))
-        #     j3d_ann_pth = pathlib.Path(ann_posp.replace('icp_res', 'jts3d'))
-        #     jts2d_ann, jts3d_ann = np.loadtxt(j2d_ann_pth), np.loadtxt(j3d_ann_pth)
-        #     all_jts2d_ann.append(jts2d_ann)
-        #     all_jts3d_ann.append(jts3d_ann)
-
-        #     all_poses_ann.append(np.loadtxt(ann_posp))
-        
-        # all_jts2d_dope = np.array(all_jts2d_dope)
-        # all_jts3d_dope = np.array(all_jts3d_dope)
-
-        # all_jts2d_ann = np.array(all_jts2d_ann)
-        # all_jts3d_ann = np.array(all_jts3d_ann)
-
-        # all_poses_ann = np.array(all_poses_ann)
-
-        # all_missing_dets[sqn] = [missing_dets_frms, len(missing_dets_frms), len(all_jts3d_ann)+len(missing_dets_frms)]
-
-        # assert len(all_jts3d_dope) == len(all_jts3d_ann), f"missamatch b/w dope {all_jts3d_dope.shape} and ann 3Djts {all_jts3d_ann.shape}"
-        # assert len(all_jts2d_dope) == len(all_jts2d_ann), f"missamatch b/w dope {all_jts2d_dope.shape} and ann 2Djts {all_jts3d_ann.shape}"
-
-        bb()
-        """
-
+        save_dict = dict()
         print('Load Dope dets and Annotated jts...')
         for j2d_annp, j3d_annp in zip(all_jts2d_ann_pths, all_jts3d_ann_pths):
             dope_pkl_pth = pathlib.Path((j3d_annp.replace('jts3d', 'dope_dets')).replace('txt', 'pkl'))
@@ -221,7 +189,7 @@ if __name__ == "__main__":
 
         all_poses_ann = np.array(all_poses_ann)
 
-        all_missing_dets[sqn] = [missing_dets_frms, len(missing_dets_frms), len(missing_dets_frms) / (len(all_jts3d_ann)+len(missing_dets_frms))]
+        all_missing_dets_info = [missing_dets_frms, len(missing_dets_frms), len(missing_dets_frms) / (len(all_jts3d_ann)+len(missing_dets_frms))]
 
         assert len(all_jts3d_dope) == len(all_jts3d_ann), f"missamatch b/w dope {all_jts3d_dope.shape} and ann 3Djts {all_jts3d_ann.shape}"
         assert len(all_jts2d_dope) == len(all_jts2d_ann), f"missamatch b/w dope {all_jts2d_dope.shape} and ann 2Djts {all_jts3d_ann.shape}"\
@@ -231,10 +199,19 @@ if __name__ == "__main__":
             all_jts2d = filter_jts(all_jts2d_dope, window=5)
             all_jts3d = filter_jts(all_jts3d_dope, window=5)
 
+
+
         # REL-POSE for DOPE
         all_r2c_trnsfms, all_jts3d_cam = compute_root2cam_ops(all_jts2d, all_jts3d)
-
         all_jts3d_prcrst_pose_rel, all_jts3d_prcrst_algnd = compute_relp_cam_from_jts3d(all_jts3d_cam, rel_type='REF')
+
+        # REPRJ Error on r2cs
+        projtd_jts2d = []
+        for r2c, j3d in zip(all_r2c_trnsfms, all_jts3d):
+            proj_mat = CAM_INTR @ r2c
+            projtd_jts2d.append(project(P=proj_mat, X=j3d))
+        mean_rep_err = np.mean(np.linalg.norm(all_jts2d - projtd_jts2d, axis=2), 1).mean()
+        print(f"Reproj Err: {mean_rep_err} pixs")
 
         # REL-POSE for Anno
         rel_type = 'REF'
@@ -247,6 +224,7 @@ if __name__ == "__main__":
                 )
             all_poses_ann_prcst_rel, all_jts3d_ann_prcst_algnd = compute_relp_cam_from_jts3d(all_jts3d_ann, rel_type='REF')
         
+        # bb()
         ## Relative rotation erorr
         # using rel-pose obtained from ann poses
         all_rel_rot_err = np.array(
@@ -259,25 +237,42 @@ if __name__ == "__main__":
             for i in range(1, len(all_jts3d_prcrst_pose_rel))]
             )
         
-        # print rot err
-        print("all_jts3d_prcrst_pose_rel_rot_err:")
-        _ = disp_rot_err(all_jts3d_prcrst_pose_rel_rot_err, just_mean=True)
-        print("all_rel_rot_err:")
-        _ = disp_rot_err(all_rel_rot_err, just_mean=True)
-        
         ## Relative translation error
         # using rel-pose obtained from ann poses
         all_rel_tran_err = np.linalg.norm((all_jts3d_prcrst_pose_rel[1:, :3, 3] - all_poses_ann_rel[:, :3, 3]), axis=1)
         # using rel-pose obtained from ann 3d jts prcst
         all_jts3d_prcrst_pose_rel_tran_err = np.linalg.norm((all_jts3d_prcrst_pose_rel[:, :3, 3] - all_poses_ann_prcst_rel[:, :3, 3]), axis=1)
 
-        # print tran err
-        print("all_jts3d_prcrst_pose_rel_tran_err:")
-        _ = disp_tran_err(all_jts3d_prcrst_pose_rel_tran_err, just_mean=True)
-        print("all_rel_tran_err:")
-        _ = disp_tran_err(all_rel_tran_err, just_mean=True)
-        
+        all_seqs_mean_RRE.append(all_jts3d_prcrst_pose_rel_rot_err.mean())
+        all_seqs_mean_RTE.append(all_jts3d_prcrst_pose_rel_tran_err.mean())
 
+        # print errs
+        print("all_jts3d_prcrst_pose_rel_rot_err:", all_jts3d_prcrst_pose_rel_rot_err.mean(), 'deg')
+        # _ = disp_rot_err(all_jts3d_prcrst_pose_rel_rot_err, just_mean=True)
+        # print tran err
+        print("all_jts3d_prcrst_pose_rel_tran_err:", all_jts3d_prcrst_pose_rel_tran_err.mean(), 'm')
+        # _ = disp_tran_err(all_jts3d_prcrst_pose_rel_tran_err, just_mean=True)
+
+        # do not use below values
+        # print("all_rel_rot_err:", all_rel_rot_err.mean())
+        # _ = disp_rot_err(all_rel_rot_err, just_mean=True)
+        # print("all_rel_tran_err:", all_rel_tran_err.mean())
+        # _ = disp_tran_err(all_rel_tran_err, just_mean=True)
+
+        print('Saving the rel pose error')
+        save_dict = {
+            'sqn' : sqn,
+            'REPE_mean': mean_rep_err,
+            'RRE': all_jts3d_prcrst_pose_rel_rot_err,
+            'RRE_mean' : np.mean(all_jts3d_prcrst_pose_rel_rot_err),
+            'RTE' : all_jts3d_prcrst_pose_rel_tran_err,
+            'RTE_mean' : np.mean(all_jts3d_prcrst_pose_rel_tran_err),
+            'missing_det_info': all_missing_dets_info
+        }
+        save_dict_pth = osp.join(RES_DIR, sqn, 'eval_rel_pose_dopepkl')
+        saveas_pkl(save_dict, save_dict_pth)
+        print(f"save here: {save_dict_pth}")
+        
         # bb()
         if False:
             # plot ann pose hand centers and r2c pose hand centers
@@ -347,5 +342,13 @@ if __name__ == "__main__":
                 o3d.io.write_point_cloud('out/anns/ann_r2c_cam_centers.ply', pcd_r2c_cc, write_ascii=True)
 
                 bb()
+    
+    all_seqs_mean_RRE = np.array(all_seqs_mean_RRE)
+    all_seqs_mean_RTE = np.array(all_seqs_mean_RTE)
+
+    print('Avg of mean-RRE of all seqs:', all_seqs_mean_RRE.mean())
+    print('Avg of mean-RTE of all seqs:', all_seqs_mean_RTE.mean())
+
+    print('Done!')
 
 
