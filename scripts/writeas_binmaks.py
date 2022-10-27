@@ -13,6 +13,13 @@ def get_bin_mask(im, th=0, val=255):
     return im_bin
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser('compute relative poses')
+    # parser.add_argument('--sqn', type=str, default=None, help='seq id')
+    parser.add_argument('--start_ind', type=int, default=None, help='seq id')
+    parser.add_argument('--end_ind', type=int, default=None, help='seq id')
+    
+    args = parser.parse_args()
     # select all the sids with .tar 
     all_seqs_tar_pths = glob.glob(f"{RES_DIR}/*.tar")
     all_sqns = []
@@ -22,20 +29,18 @@ if __name__ == "__main__":
 
     print(f"All seq ids: \n {all_sqns}")
 
-    for sqn in tqdm(all_sqns):
+    for sqn in tqdm(all_sqns[args.start_ind: args.end_ind]):
         print(f"seq: {sqn}")
+        # get hand-obj img from slvless_img 
+        slvless_imgs_pths = sorted(glob.glob(osp.join(RES_DIR, sqn, 'slvless_img/*.png')))
 
-        if sqn == '20220907152036':
-            # get hand-obj img from slvless_img 
-            slvless_imgs_pths = sorted(glob.glob(osp.join(RES_DIR, sqn, 'slvless_img/*.png')))
-
-            for slvless_imgp in tqdm(slvless_imgs_pths):
-                slvless_img = cv2.imread(slvless_imgp)
-                slvless_img_bin = get_bin_mask(im=slvless_img, th=0, val=255)
-                
-                fn_slvless_img_bin = slvless_imgp.replace('slvless_img', 'slvless_img_bin')
-                os.makedirs(osp.dirname(fn_slvless_img_bin), exist_ok=True)
-                cv2.imwrite(fn_slvless_img_bin, slvless_img_bin)
+        for slvless_imgp in tqdm(slvless_imgs_pths):
+            slvless_img = cv2.imread(slvless_imgp)
+            slvless_img_bin = get_bin_mask(im=slvless_img, th=0, val=255)
+            
+            fn_slvless_img_bin = slvless_imgp.replace('slvless_img', 'slvless_img_bin')
+            os.makedirs(osp.dirname(fn_slvless_img_bin), exist_ok=True)
+            cv2.imwrite(fn_slvless_img_bin, slvless_img_bin)
 
 
 

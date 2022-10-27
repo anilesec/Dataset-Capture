@@ -31,6 +31,11 @@ def trnsfm_jts3d_to_all_frms(jts3d_pth, all_frms_poses_pths, save_dir):
 
 if __name__ == "__main__":
     print(f"This scripts transforms the annotated 3d joints to all frames using ann poses")
+    import argparse
+    parser = argparse.ArgumentParser('compute relative poses')
+    parser.add_argument('--sqn', type=str, default=None, help='seq id')
+    
+    args = parser.parse_args()
     # select all the sids with .tar 
     all_seqs_tar_pths = glob.glob(f"{RES_DIR}/*.tar")
     all_sqns = []
@@ -40,11 +45,13 @@ if __name__ == "__main__":
 
     print(f"All seq ids: \n {all_sqns}")
 
-    for sqn in tqdm(all_sqns):
-        print(f"seq: {sqn}")
+    if args.sqn is not None:
+        all_sqns = [args.sqn]
 
+    for sqn in tqdm(all_sqns):
+        print(f"sqn: {sqn}")
         # get 3d jts
-        jts3d_pth = pathlib.Path(f'{RES_DIR}/{sqn}/jts3d.txt')
+        jts3d_pth = pathlib.Path(f'{RES_DIR}/{sqn}/jts3d_disp.txt')
 
         missing_jts3d_seqs = []
         if not jts3d_pth.exists():
@@ -55,7 +62,7 @@ if __name__ == "__main__":
         # get all anno poses
         all_frms_poses_pths = sorted(glob.glob(f'{RES_DIR}/{sqn}/icp_res/*/f_trans.txt'))
 
-        save_dir = osp.join(RES_DIR, sqn, 'jts3d')
+        save_dir = osp.join(RES_DIR, sqn, 'jts3d_disp')
 
         # transform jts3d ann to all frames
         trnsfm_jts3d_to_all_frms(jts3d_pth, all_frms_poses_pths, save_dir)

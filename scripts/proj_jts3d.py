@@ -17,7 +17,7 @@ intrinsics = np.array(
             [  0.   , 900.019, 362.143],
             [  0.   ,   0.   ,   1.   ]]
             )
-    
+RES_DIR = '/scratch/1/user/aswamy/data/hand-obj/'    
 
 def tform_points(T, X):
     """
@@ -60,7 +60,7 @@ def plot_onto_img(img, pts):
 
 def proj_jts3d_onto_frms(jts3d, all_frms_poses_pths, imgs_dir, save_dir, intrinsics):
     for idx, posp in tqdm(enumerate((all_frms_poses_pths))):
-        frm_no = osp.basename(osp.dirname(posp))[-3:]
+        frm_no = osp.basename(osp.dirname(posp))[-4:]
         imgp = osp.join(imgs_dir, f'{int(frm_no):010d}.png')  # try to have frame id between 0 to 999
         # bb()
         if not Path(imgp).is_file():
@@ -92,7 +92,46 @@ if __name__ == "__main__":
     import argparse
     import pathlib
 
-    parser = argparse.ArgumentParser("project GT pcd to all frames of a given seq")
+    parser = argparse.ArgumentParser("project each frame 3d jts to all frames of a given seq")
+    parser.add_argument('--sqn', type=str, default=None,
+                        help='seq name')
+    args = parser.parse_args()
+    print("args:", args)
+
+    # select all the sids with .tar 
+    all_seqs_tar_pths = glob.glob(f"{RES_DIR}/*.tar")
+    all_sqns = []
+    for spth in all_seqs_tar_pths:
+        if os.path.isfile(spth):
+            all_sqns.append(osp.basename(spth.split('.')[0]))
+    # bb()
+    if args.sqn is not None:
+        assert args.sqn in all_sqns, f"{args.sqn} is not present in listed sequences!!!"
+        
+        all_sqns = [args.sqn]
+
+    for sqn in all_sqns:
+        print(f'sqn:{sqn}')
+        jts3d = np.loadtxt(f'{RES_DIR}/{sqn}/jts3d_disp.txt')
+
+        all_frms_poses_pths = sorted(glob.glob(f'{RES_DIR}/{sqn}/icp_res/*/f_trans.txt'))
+
+        imgs_dir = f'{RES_DIR}/{sqn}/rgb'
+        assert Path(imgs_dir).is_dir(), f"rgb dir does not exist {imgs_dir}" 
+
+        save_dir = f'{RES_DIR}/{sqn}/proj_jts_disp'
+
+        out = proj_jts3d_onto_frms(jts3d, all_frms_poses_pths, imgs_dir, save_dir, intrinsics)
+    
+        print('Done!')
+
+
+
+if __name__ == "__main__" and False:
+    import argparse
+    import pathlib
+
+    parser = argparse.ArgumentParser("project GT jts3d to all frames of a given seq")
     parser.add_argument('--sqn', type=str, default=None,
                         help='seq name')
     parser.add_argument('--sqn_res_dir', type=str, default=None,
@@ -111,7 +150,7 @@ if __name__ == "__main__":
     
     all_frms_poses_pths = sorted(glob.glob(f'{RES_DIR}/{args.sqn}/icp_res/*/f_trans.txt'))
     # bb()
-
+    
     imgs_dir = f'{RES_DIR}/{args.sqn}/rgb'
     assert Path(imgs_dir).is_dir(), f"rgb dir does not exist {imgs_dir}" 
 

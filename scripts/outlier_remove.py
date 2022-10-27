@@ -67,7 +67,7 @@ if __name__ == "__main__":
                         help='voxel size for down sampling')
     parser.add_argument('--radius', type=float, default=0.01,
                         help='outlier search radius of sphere')
-    parser.add_argument('--num_nibrs', type=int, default=200,
+    parser.add_argument('--num_nibrs', type=int, default=150,
                         help='min no of points to be present in the sphere for inlier cond.')
     parser.add_argument('--start_ind', type=int, default=None,
                         help='start index of a seq')

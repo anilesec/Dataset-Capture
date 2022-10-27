@@ -75,7 +75,7 @@ if True:
         return print(f'final pcd:{curr_frm_f_pcd_write_pth}, final trnsfm:{curr_frm_f_write_pth}')
 
 
-    seq = '20220905155551'
+    seq = '20220824144438'
 
     if seq == '20220705173214':
         for frm_idx in range(800, 900):
@@ -137,8 +137,9 @@ if True:
             curr_frm_f_write_pth = f'/scratch/github_repos/Fast-Robust-ICP/res/{seq}/frm{frm_idx}/f_trans.txt'
             curr_frm_f_pcd_write_pth = f'/scratch/github_repos/Fast-Robust-ICP/res/{seq}/frm{frm_idx}/f_pcd.ply'
             finalize(curr_frm_pcd_pth, curr_frm_o_pth, curr_frm_i_pth, curr_frm_f_write_pth, curr_frm_f_pcd_write_pth)
-    elif seq == '20220905155551':
-        for frm_idx in range(1, 1250):
+
+    elif seq == '20220824144438':
+        for frm_idx in range(1, 1140    ):
             start = time.time()
             ICP_DIR = '/scratch/1/user/aswamy/github_repos/Fast-Robust-ICP'
             SAVE_DIR = '/scratch/1/user/aswamy/data/hand-obj'

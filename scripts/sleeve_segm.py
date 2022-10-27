@@ -135,8 +135,8 @@ if __name__ == "__main__":
     parser.add_argument('--end_ind', type=int, default=None,
                         help='end index of the frame')
     parser.add_argument('--norm_type', type=str, default='L2',
-                        help='norm coice; "L2" or "ratio"')
-    parser.add_argument('--kms_num_clstrs', type=int, default=4,
+                        help='norm coice; "L2" or "rat"')
+    parser.add_argument('--kms_num_clstrs', type=int, default=5,
                         help='k-means number of clusters')
     # parser.add_argument('--debug', type=int, default=0,
     #                     help='set to 1 for breakpoint') 
@@ -152,58 +152,3 @@ if __name__ == "__main__":
                 end_ind=args.end_ind, norm_type=args.norm_type, kmeans_max_iter=KMEANS_MAX_ITER,
                 kmeans_eps=KMEANS_EPSILON, kmeans_num_clustrs=args.kms_num_clstrs)
     print('Done!')
-
-    """
-    if args.start_ind is None:
-        args.start_ind = 0
-        
-    if args.end_ind is None:
-        args.end_ind = len(rgbs_pths)
-
-    for idx, imp in tqdm(enumerate(rgbs_pths[args.start_ind: args.end_ind])):
-        im = np.array(Image.open(imp))
-
-        # normalize image
-        if args.norm_type == 'L2':
-            im_norm = 255. * im / (np.linalg.norm(im, axis=-1)[:,:,None] + 1e-6)
-            iTHRESH = 50  # normalized intensity thresh (this should be adjusted for each seq/when ration is used instead of L2 normalization)
-        else:
-            im_norm = 255. * im / (np.sum(im,axis=-1)[:,:,None] + 1e-6)
-            iTHRESH = 110  # normalized intensity thresh (this should be adjusted for each seq/when ration is used instead of L2 normalization)
-
-        #k-means on normalized image space
-        criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, KMEANS_MAX_ITER, KMEANS_EPSILON)
-        _, labels, (centers) = cv2.kmeans(im_norm.reshape([-1, 3]).astype(np.float32), KMEANS_NUM_CLUSTERS, None, criteria, 3, cv2.KMEANS_RANDOM_CENTERS)
-
-        # Compute segmented image
-        centers = np.uint8(centers)
-        segmented_image = centers[labels.flatten()]
-        segmented_image = segmented_image.reshape(im.shape)
-
-        arm = np.linalg.norm(segmented_image - np.array(ARM_COLOR)[None, None], axis=-1) < iTHRESH
-
-        # Remove small components after small hole filling
-        arm = binary_erosion(binary_erosion(binary_dilation(binary_dilation(binary_dilation(arm)))))
-        armLCC = getLargestCC(arm)
-
-        fn_slv_mask = os.path.join(args.save_rt_dir, f'slv_msk_{args.norm_type}_kmeans{KMEANS_MAX_ITER}mxiter_lcc', osp.basename(imp))
-        if not os.path.exists(os.path.dirname(fn_slv_mask)):
-            os.makedirs(os.path.dirname(fn_slv_mask))
-        slv_msk = armLCC.astype(np.uint8) * 255
-        Image.fromarray(slv_msk).save(fn_slv_mask)
-
-        # fn_mask_wo_slv = os.path.join(args.save_rt_dir, 'slv_mskinv_kmeans_lcc_kmeans10iter', osp.basename(imp))
-        # if not os.path.exists(os.path.dirname(fn_mask_wo_slv)):
-        #     os.makedirs(os.path.dirname(fn_mask_wo_slv))
-        slvless_msk = np.logical_not(armLCC).astype(np.uint8) * 255
-        # Image.fromarray(slvless_msk).save(fn_mask_wo_slv)
-
-        fn_im_woslv = os.path.join(args.save_rt_dir, f'img_woslv_{args.norm_type}_kmeans{KMEANS_MAX_ITER}mxiter_lcc', osp.basename(imp))
-        if not os.path.exists(os.path.dirname(fn_im_woslv)):
-            os.makedirs(os.path.dirname(fn_im_woslv))
-        masked = cv2.bitwise_and(im[:, :, ::-1], im[:, :, ::-1], mask=slvless_msk)
-        Image.fromarray(masked[:, :, ::-1]).save(fn_im_woslv)
-
-    print('Done!')
-    """
- 

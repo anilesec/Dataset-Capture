@@ -1,5 +1,3 @@
-from dis import dis
-from tkinter.messagebox import NO
 import numpy as np
 import os, sys, glob
 from ipdb import set_trace as bb
@@ -140,117 +138,120 @@ if __name__ == "__main__":
         if os.path.isfile(spth):
             all_sqns.append(osp.basename(spth.split('.')[0]))
 
+    if args.sqn is not None:
+        assert args.sqn in all_sqns, f"{args.sqn} is not present in listed sequences!!!"
+        all_sqns = [args.sqn]
+
     if args.sqn in all_sqns:
-        if args.sqn in all_sqns:
-            # load ann poses
-            print('Loading annotation poses...')
-            seq_pose3d_ann_dir = osp.join(RES_DIR, args.sqn, 'icp_res')
-            all_poses_ann = load_poses3d_ann(seq_pose3d_ann_dir)
+        # load ann poses
+        print('Loading annotation poses...')
+        seq_pose3d_ann_dir = osp.join(RES_DIR, args.sqn, 'icp_res')
+        all_poses_ann = load_poses3d_ann(seq_pose3d_ann_dir)
 
-            # load ann 2d and 3d jts
-            print('Loading annotation 2d & 3d jts...')
-            sqn_dir = osp.join(RES_DIR, args.sqn)
-            all_jts2d_ann, all_jts3d_ann = load_ann_jts(sqn_dir)
+        # load ann 2d and 3d jts
+        print('Loading annotation 2d & 3d jts...')
+        sqn_dir = osp.join(RES_DIR, args.sqn)
+        all_jts2d_ann, all_jts3d_ann = load_ann_jts(sqn_dir)
 
-            # add gaus noise
-            if args.add_noise:
-                noise = np.random.normal(loc=0., scale=0.005, size=all_jts3d_ann.shape)
-                all_jts3d_ann = all_jts3d_ann + noise
+        # add gaus noise
+        if args.add_noise:
+            noise = np.random.normal(loc=0., scale=0.005, size=all_jts3d_ann.shape)
+            all_jts3d_ann = all_jts3d_ann + noise
 
-            if args.bsln == 'DOPE':
-                dets_pkls_dir = osp.join(RES_DIR, args.sqn, 'dope_dets')
-                all_jts2d, all_jts3d = load_dope_poses(dets_pkls_dir)
+        if args.bsln == 'DOPE':
+            dets_pkls_dir = osp.join(RES_DIR, args.sqn, 'dope_dets')
+            all_jts2d, all_jts3d = load_dope_poses(dets_pkls_dir)
 
-                # median filtering the dope joints
-                if args.filter:
-                    all_jts2d = filter_jts(all_jts2d, window=5)
-                    all_jts3d = filter_jts(all_jts3d, window=5)
+            # median filtering the dope joints
+            if args.filter:
+                all_jts2d = filter_jts(all_jts2d, window=5)
+                all_jts3d = filter_jts(all_jts3d, window=5)
 
-            all_r2c_trnsfms, all_jts3d_cam = compute_root2cam_ops(all_jts2d, all_jts3d)
+        all_r2c_trnsfms, all_jts3d_cam = compute_root2cam_ops(all_jts2d, all_jts3d)
 
-            all_jts3d_prcrst_pose_rel, all_jts3d_prcrst_algnd = compute_relp_cam_from_jts3d(all_jts3d_cam, rel_type='REF')
+        all_jts3d_prcrst_pose_rel, all_jts3d_prcrst_algnd = compute_relp_cam_from_jts3d(all_jts3d_cam, rel_type='REF')
 
-            rel_type = 'REF'
-            if rel_type == 'CONSEQ':
-                pass 
-            elif rel_type == 'REF':
-                all_poses_ann_rel = np.array(
-                    [all_poses_ann[idx] @ np.linalg.inv(all_poses_ann[0])
-                    for idx in range(1, len(all_poses_ann))]
-                    )
-                all_poses_ann_prcst_rel, all_jts3d_ann_prcst_algnd = compute_relp_cam_from_jts3d(all_jts3d_ann, rel_type='REF')
-            
-            ## Relative rotation erorr
-            # using rel-pose obtained from ann poses
-            all_rel_rot_err = np.array(
-                [(geodesic_distance_for_rotations(all_jts3d_prcrst_pose_rel[i, :3, :3], all_poses_ann_rel[i-1, :3, :3]) * (180 / np.pi))
-             for i in range(1, len(all_jts3d_prcrst_pose_rel))]
-             )
-            # using rel-pose obtained from ann 3d jts prcst
-            all_jts3d_prcrst_pose_rel_rot_err = np.array(
-                [(geodesic_distance_for_rotations(all_jts3d_prcrst_pose_rel[i, :3, :3], all_poses_ann_prcst_rel[i, :3, :3]) * (180 / np.pi))
-             for i in range(1, len(all_jts3d_prcrst_pose_rel))]
-             )
-            
-            # print rot err
-            print("all_jts3d_prcrst_pose_rel_rot_err:")
-            _ = disp_rot_err(all_jts3d_prcrst_pose_rel_rot_err, just_mean=True)
-            print("all_rel_rot_err:")
-            _ = disp_rot_err(all_rel_rot_err, just_mean=True)
-            
-            ## Relative translation error
-            # using rel-pose obtained from ann poses
-            all_rel_tran_err = np.linalg.norm((all_jts3d_prcrst_pose_rel[1:, :3, 3] - all_poses_ann_rel[:, :3, 3]), axis=1)
-            # using rel-pose obtained from ann 3d jts prcst
-            all_jts3d_prcrst_pose_rel_tran_err = np.linalg.norm((all_jts3d_prcrst_pose_rel[:, :3, 3] - all_poses_ann_prcst_rel[:, :3, 3]), axis=1)
-
-            # print tran err
-            print("all_jts3d_prcrst_pose_rel_tran_err:")
-            _ = disp_tran_err(all_jts3d_prcrst_pose_rel_tran_err, just_mean=True)
-            print("all_rel_tran_err:")
-            _ = disp_tran_err(all_rel_tran_err, just_mean=True)
-            
-
-            # bb()
-            if False:
-                # plot ann pose hand centers and r2c pose hand centers
-                all_jts3d_prcrst_pose_rel_tran = all_jts3d_prcrst_pose_rel[:, :3, 3]
-                all_poses_ann_rel_tran = all_poses_ann_rel[:, :3, 3]
-                import open3d as o3d
-                pcd_all_poses_ann_rel_tran = o3d.geometry.PointCloud()
-                pcd_all_poses_ann_rel_tran.points = o3d.pybind.utility.Vector3dVector(all_poses_ann_rel_tran)
-                o3d.io.write_point_cloud('out/anns/all_poses_ann_rel_tran.ply', pcd_all_poses_ann_rel_tran, write_ascii=True)
-
-                pcd_all_jts3d_prcrst_pose_rel_tran = o3d.geometry.PointCloud()
-                pcd_all_jts3d_prcrst_pose_rel_tran.points = o3d.pybind.utility.Vector3dVector(all_jts3d_prcrst_pose_rel_tran)
-                o3d.io.write_point_cloud('out/anns/all_jts3d_prcrst_pose_rel_tran.ply', pcd_all_jts3d_prcrst_pose_rel_tran, write_ascii=True)
-
-                pts_trnsfmd, trnsfm = compute_similarity_transform(all_jts3d_prcrst_pose_rel_tran[1:], all_poses_ann_rel_tran, return_transfom=True, mu_idx=None, scale=1)
-                r2c_to_ann_trnsfm = rotran2homat(trnsfm['rot'], trnsfm['tran'].flatten())
-                all_r2c_transl_algnd2ann = np.array(pts_trnsfmd)
-                pcd_pts_trnsfmd = o3d.geometry.PointCloud()
-                pcd_pts_trnsfmd.points = o3d.pybind.utility.Vector3dVector(pts_trnsfmd)
-                o3d.io.write_point_cloud('out/anns/pts_trnsfmd.ply', pcd_pts_trnsfmd, write_ascii=True)
-
-            if False:    
-                import torch, roma
-                res1 = roma.rotmat_geodesic_distance_naive(torch.tensor(all_jts3d_prcrst_pose_rel[1:, :3, :3]), torch.tensor(all_poses_ann_rel[:, :3, :3]))
-                print(f"{res1.mean() * (180 / np.pi)} deg")
-            
-            # juxt viz
-            if False: 
-                all_imgs_pths = sorted(glob.glob(osp.join(RES_DIR, args.sqn, 'rgb/*.png')))
-                print('Loading images...')
-                all_inp_imgs = np.array(
-                    [cv2.imread(imp)[:, :, ::-1] for imp in tqdm(all_imgs_pths)]
+        rel_type = 'REF'
+        if rel_type == 'CONSEQ':
+            raise NotImplementedError 
+        elif rel_type == 'REF':
+            all_poses_ann_rel = np.array(
+                [all_poses_ann[idx] @ np.linalg.inv(all_poses_ann[0])
+                for idx in range(1, len(all_poses_ann))]
                 )
-                save_pth = os.path.join('./out/vid_dope_fltr{args.filter}_{args.sqn}.mp4')
-                create_juxt_vid(filepath=save_pth, inp_imgs=all_inp_imgs, jts_order='DOPE',
-                            all_2d_jts=all_jts2d, all_3d_jts_rt=all_jts3d,
-                            all_3d_jts_cam=all_jts3d_cam, all_3d_jts_prcst_algnd=None)
+            all_poses_ann_prcst_rel, all_jts3d_ann_prcst_algnd = compute_relp_cam_from_jts3d(all_jts3d_ann, rel_type='REF')
+        
+        ## Relative rotation erorr
+        # using rel-pose obtained from ann poses
+        all_rel_rot_err = np.array(
+            [(geodesic_distance_for_rotations(all_jts3d_prcrst_pose_rel[i, :3, :3], all_poses_ann_rel[i-1, :3, :3]) * (180 / np.pi))
+            for i in range(1, len(all_jts3d_prcrst_pose_rel))]
+            )
+        # using rel-pose obtained from ann 3d jts prcst
+        all_jts3d_prcrst_pose_rel_rot_err = np.array(
+            [(geodesic_distance_for_rotations(all_jts3d_prcrst_pose_rel[i, :3, :3], all_poses_ann_prcst_rel[i, :3, :3]) * (180 / np.pi))
+            for i in range(1, len(all_jts3d_prcrst_pose_rel))]
+            )
+        
+        # print rot err
+        print("all_jts3d_prcrst_pose_rel_rot_err:")
+        _ = disp_rot_err(all_jts3d_prcrst_pose_rel_rot_err, just_mean=True)
+        print("all_rel_rot_err:")
+        _ = disp_rot_err(all_rel_rot_err, just_mean=True)
+        
+        ## Relative translation error
+        # using rel-pose obtained from ann poses
+        all_rel_tran_err = np.linalg.norm((all_jts3d_prcrst_pose_rel[1:, :3, 3] - all_poses_ann_rel[:, :3, 3]), axis=1)
+        # using rel-pose obtained from ann 3d jts prcst
+        all_jts3d_prcrst_pose_rel_tran_err = np.linalg.norm((all_jts3d_prcrst_pose_rel[:, :3, 3] - all_poses_ann_prcst_rel[:, :3, 3]), axis=1)
 
-            # .ply files
-            if False:
+        # print tran err
+        print("all_jts3d_prcrst_pose_rel_tran_err:")
+        _ = disp_tran_err(all_jts3d_prcrst_pose_rel_tran_err, just_mean=True)
+        print("all_rel_tran_err:")
+        _ = disp_tran_err(all_rel_tran_err, just_mean=True)
+        
+
+        # bb()
+        if False:
+            # plot ann pose hand centers and r2c pose hand centers
+            all_jts3d_prcrst_pose_rel_tran = all_jts3d_prcrst_pose_rel[:, :3, 3]
+            all_poses_ann_rel_tran = all_poses_ann_rel[:, :3, 3]
+            import open3d as o3d
+            pcd_all_poses_ann_rel_tran = o3d.geometry.PointCloud()
+            pcd_all_poses_ann_rel_tran.points = o3d.pybind.utility.Vector3dVector(all_poses_ann_rel_tran)
+            o3d.io.write_point_cloud('out/anns/all_poses_ann_rel_tran.ply', pcd_all_poses_ann_rel_tran, write_ascii=True)
+
+            pcd_all_jts3d_prcrst_pose_rel_tran = o3d.geometry.PointCloud()
+            pcd_all_jts3d_prcrst_pose_rel_tran.points = o3d.pybind.utility.Vector3dVector(all_jts3d_prcrst_pose_rel_tran)
+            o3d.io.write_point_cloud('out/anns/all_jts3d_prcrst_pose_rel_tran.ply', pcd_all_jts3d_prcrst_pose_rel_tran, write_ascii=True)
+
+            pts_trnsfmd, trnsfm = compute_similarity_transform(all_jts3d_prcrst_pose_rel_tran[1:], all_poses_ann_rel_tran, return_transfom=True, mu_idx=None, scale=1)
+            r2c_to_ann_trnsfm = rotran2homat(trnsfm['rot'], trnsfm['tran'].flatten())
+            all_r2c_transl_algnd2ann = np.array(pts_trnsfmd)
+            pcd_pts_trnsfmd = o3d.geometry.PointCloud()
+            pcd_pts_trnsfmd.points = o3d.pybind.utility.Vector3dVector(pts_trnsfmd)
+            o3d.io.write_point_cloud('out/anns/pts_trnsfmd.ply', pcd_pts_trnsfmd, write_ascii=True)
+
+        if False:    
+            import torch, roma
+            res1 = roma.rotmat_geodesic_distance_naive(torch.tensor(all_jts3d_prcrst_pose_rel[1:, :3, :3]), torch.tensor(all_poses_ann_rel[:, :3, :3]))
+            print(f"{res1.mean() * (180 / np.pi)} deg")
+        
+        # juxt viz
+        if False: 
+            all_imgs_pths = sorted(glob.glob(osp.join(RES_DIR, args.sqn, 'rgb/*.png')))
+            print('Loading images...')
+            all_inp_imgs = np.array(
+                [cv2.imread(imp)[:, :, ::-1] for imp in tqdm(all_imgs_pths)]
+            )
+            save_pth = os.path.join('./out/vid_dope_fltr{args.filter}_{args.sqn}.mp4')
+            create_juxt_vid(filepath=save_pth, inp_imgs=all_inp_imgs, jts_order='DOPE',
+                        all_2d_jts=all_jts2d, all_3d_jts_rt=all_jts3d,
+                        all_3d_jts_cam=all_jts3d_cam, all_3d_jts_prcst_algnd=None)
+
+        # .ply files
+        if False:
                 # plot ann pose hand centers and r2c pose hand centers
                 all_ann_transl = all_poses_ann[:, :3, 3]
                 all_r2c_transl = all_r2c_trnsfms[:, :3, 3]
@@ -281,10 +282,4 @@ if __name__ == "__main__":
 
                 bb()
 
-    else:
-        raise ValueError(f"{args.sqn} is not present in selected all_sqns list, check the sqn value!!")
 
-
-
-    
-# res1 = roma.rotmat_geodesic_distance_naive(torch.tensor(all_jts3d_prcrst_pose_rel[1:, :3, :3]), torch.tensor(all_poses_ann_rel[:, :3, :3])

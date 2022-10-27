@@ -269,7 +269,7 @@ class L515DataInterface:
      save_mask=False, save_pcd=False, pcd_bkgd_rm=False, pcd_with_color=False,
      pcd_with_normals=False, dist_thresh=0.8, crop_slv=False, depth_type='dist_xyz',
      start_ind=None, end_ind=None, slv_clr=None, norm_type=None, kms_max_iter=None,
-     kms_eps=None, kms_num_clstrs=None):
+     kms_eps=None, kms_num_clstrs=None, sqn=None):
         self.inp_seq_dir = inp_seq_dir
         self.save_base_dir = save_base_dir
         self.save_rgb = save_rgb
@@ -284,6 +284,7 @@ class L515DataInterface:
         self.dist_thresh = dist_thresh
         self.start_ind = start_ind
         self.end_ind = end_ind
+        self.sqn = sqn
 
         # sleeve segm parameters
         if slv_clr is not None:
@@ -436,6 +437,22 @@ class L515DataInterface:
         print(f"PCD saved here: {pcd_sdir}")
 
 
+        return None
+
+    def rm_smlcomps_slvless_img(self,):
+
+        slvless_imgs_dir = osp.join(self.save_base_dir, self.sqn, 'slvless_img')
+        slvless_imgs_pths = sorted(glob.glob(osp.join(slvless_imgs_dir, '*.png')))
+
+        for slvless_imp in tqdm(slvless_imgs_pths[self.start_ind : self.end_ind]):
+            im = cv2.imread(slvless_imp)
+            im_norm = 255. * im / (np.sum(im,axis=-1)[:, :, None] + 1e-6)
+            im_mask = (im_norm.sum(2) > 0.0).astype(np.uint8)
+            # bb()
+            lcc = getLargestCC(im_mask)
+            im_lcc = cv2.bitwise_and(im, im, mask=lcc.astype(np.uint8))
+            cv2.imwrite(slvless_imp, im_lcc)
+        
         return None
 
     def save_pointclouds(self,):
@@ -688,7 +705,7 @@ if __name__ == "__main__":
                         help='k-means max iteration criteria (increases computation time)') 
     parser.add_argument('--kms_eps', type=float, default=0.2,
                         help='k-means accuracy criteria')                        
-    parser.add_argument('--kms_num_clstrs', type=int, default=5,
+    parser.add_argument('--kms_num_clstrs', type=int, default=4,
                         help='k-means number of clusters')
 
     parser.add_argument('--sqn', type=str, default=None,
@@ -718,14 +735,17 @@ if __name__ == "__main__":
     pcd_with_color=True, pcd_with_normals=False, dist_thresh=1.0, crop_slv=True,
     depth_type='dist_xyz', start_ind=args.start_ind, end_ind=args.end_ind, slv_clr=SLV_COLOR,
     norm_type=args.norm_type, kms_max_iter=args.kms_max_iter, kms_eps=args.kms_eps,
-    kms_num_clstrs=args.kms_num_clstrs)
+    kms_num_clstrs=args.kms_num_clstrs, sqn=args.sqn)
     # bb()
     
     # interface.create_npzs()
     # interface.save_rgbs()
     # interface.save_masks()
     # interface.save_slvless_masks()
+    interface.rm_smlcomps_slvless_img()
+
     # interface.create_slvless_img_vid()
+
     # interface.save_pointclouds()
     interface.save_pcds_from_slvless_img()
     interface.save_outlr_rm_pcds(args.sqn, args.vox_size, args.radius, args.num_nibrs)

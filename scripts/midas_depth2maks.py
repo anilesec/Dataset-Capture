@@ -33,10 +33,12 @@ if __name__ == "__main__":
             # get mask
             dimg = plt.imread(dimp)
             mask = (dimg > ithresh).astype(np.uint8)
+            mask = np.expand_dims(mask, axis=2)
             save_dir = osp.join(base_dir, f'{osp.basename(dimgs_dir)}_masks_th_{ithresh:.1f}')
             fname_mask = osp.join(save_dir, osp.basename(dimp))
             os.makedirs(osp.dirname(fname_mask), exist_ok=True)
-            plt.imsave(fname_mask, mask)
+            mask_3ch = np.repeat((mask * 255).astype(np.uint8), repeats=3, axis=2)
+            cv2.imwrite(fname_mask, mask_3ch)
 
             # get masked image
             img = plt.imread(imp)
@@ -44,5 +46,5 @@ if __name__ == "__main__":
             save_dir = osp.join(base_dir, f'{osp.basename(dimgs_dir)}_masks_th_{ithresh:.1f}_mskd_img')
             fname_mskd_img = osp.join(save_dir, osp.basename(imp))
             os.makedirs(osp.dirname(fname_mskd_img), exist_ok=True)
-            plt.imsave(fname_mskd_img, mskd_img)
+            cv2.imwrite(fname_mskd_img, (mskd_img[:, :, ::-1]*255).astype(np.uint8))
             # bb()
