@@ -35,7 +35,7 @@ def viewmatrix(z, up, pos):
 def completion_ratio(gt_points, rec_points, dist_th):
     gen_points_kd_tree = KDTree(rec_points)
     distances, _ = gen_points_kd_tree.query(gt_points)
-    comp_ratio = np.mean((distances < dist_th).astype(np.float))
+    comp_ratio = np.mean((distances < dist_th).astype(float))
     return comp_ratio
 
 
@@ -195,7 +195,8 @@ def calc_3d_metric(rec_meshfile, gt_meshfile, align=False, sampl_num=100000, dis
             'precision_ratio_rec' :precision_ratio_rec,
             'completion_ratio_rec' : completion_ratio_rec,
             'fscore' : fscore,
-            'normal_acc' : normal_comp,
+            'normal_acc' : normal_acc,
+            'normal_comp': normal_comp,
             'normal_avg' : normal_avg,
             # 'ch_dist': ch_dist
     }
@@ -329,9 +330,9 @@ def calc_2d_metric(rec_meshfile, gt_meshfile, align=False, n_imgs=1000):
 
 if __name__ == '__main__':
 
-    # parser = argparse.ArgumentParser(
-    #     description='Arguments to evaluate the reconstruction.'
-    # )
+    parser = argparse.ArgumentParser(
+        description='Arguments to evaluate the reconstruction.'
+    )
     # parser.add_argument('--rec_mesh', type=str,
     #                     help='reconstructed mesh file path')
     # parser.add_argument('--gt_mesh', type=str,
@@ -340,15 +341,11 @@ if __name__ == '__main__':
     #                     help='viz the errors on pcds')
     # parser.add_argument('--save', type=str, default=0, 
     #                     help='save or not')
-    # parser.add_argument('--sampl_num', type=int, default=200000, 
-    #                     help='no of pts to sampel on surface')
-    # args = parser.parse_args()
+    parser.add_argument('--sample_num', type=int, default=200000, 
+                        help='no of pts to sampel on surface')
+    parser.add_argument('--sqn', type=str, default=None, help='')
+    args = parser.parse_args()
 
-    # print('Reconstruction evaluation execution...')
-    # for dth in tqdm(np.linspace(0.001, 0.015, 15)):
-    #     print(f'dist_thresh = {dth}')
-    #     calc_3d_metric(args.rec_mesh, args.gt_mesh, sampl_num=args.sampl_num, dist_thresh=dth, save_pkl=args.save)
-    # print('Done!')
 
     BRIAC_RECON_RES_DIR = '/scratch/1/user/aswamy/data/briac_recon_res'
     RES_DIR = '/scratch/1/user/aswamy/data/hand-obj'
@@ -356,6 +353,16 @@ if __name__ == '__main__':
 
     # get all sqn ids
     all_sqn_ids = os.listdir(BRIAC_RECON_RES_DIR)
+
+    if args.sqn is not None:
+        if args.sqn not in all_sqn_ids:
+            print(f"{args.sqn} is not present in listed sequences!!!")
+            print(f"No briac recons for {args.sqn}")
+            with open('/scratch/1/user/aswamy/data/briac_miss_sqns.txt', 'a') as f:
+                f.write(args.sqn+'\n')
+            exit()
+        all_sqn_ids = [args.sqn]
+    
     miss_gt_meshes = []
     for sqn in tqdm(all_sqn_ids):
         print(f'sqn: {sqn}')

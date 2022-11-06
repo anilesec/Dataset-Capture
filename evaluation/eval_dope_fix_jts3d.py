@@ -12,7 +12,7 @@ import sys
 from evaluation.eval_utils import *
 from evaluation.viz_utils import *
 
-PCK_THRESH = 2.0
+PCK_THRESH = 50.0
 AUC_MIN = 0.0
 AUC_MAX = 200.0
 NUM_SEQS = 87
@@ -172,7 +172,7 @@ def compute_errors(preds3d, gt3ds):
         # Root align.
         gt3d = align_by_root(gt3d)
         pred3d = align_by_root(pred3d)
-        
+        # bb()
         # Compute MPJPE
         joint_error = np.sqrt(np.sum((gt3d - pred3d) ** 2, axis=1))
         errors.append(np.mean(joint_error))
@@ -261,25 +261,39 @@ def load_dope_det_frm_pkl(pkl_pth):
 
 if __name__ == "__main__":
     RES_DIR = pathlib.Path('/scratch/1/user/aswamy/data/hand-obj')
-    # MPJPE and MPJPE_PA
+    DOPE_DETS_FIX_DIR = pathlib.Path('/scratch/1/user/aswamy/data/salma-hand-obj-fix')
+
+    # select all the sids with .tar 
+    all_seqs_tar_pths = glob.glob(f"{RES_DIR}/*.tar")
+    all_sqns = []
+    for spth in all_seqs_tar_pths:
+        if os.path.isfile(spth):
+            all_sqns.append(osp.basename(spth.split('.')[0]))
+
     # get all dope dets(pkls)
     print('Listing all dope pkl files...')
-    all_dope_pkls = sorted(glob.glob(osp.join(RES_DIR, '*/dope_dets/*.pkl')))
+    all_dope_pkls = sorted(glob.glob(osp.join(DOPE_DETS_FIX_DIR, '*/handexp_dets/*.pkl')))
 
     all_jts3d_ann = []
     all_jts3d_dope = []
     all_MPJPE = []
     all_MPJPE_PA = []
     missing_poses_frms = []
+    missing_dope_dets = []
     for pklpth in tqdm(all_dope_pkls):
         # bb()
         # check if pose/3D jts exist for corresponding dope det
-        jts3d_ann_pth = pathlib.Path(pklpth.replace('dope_dets', 'jts3d_disp').replace('pkl', 'txt'))
+        jts3d_ann_pth = pathlib.Path((pklpth.replace('handexp_dets', 'jts3d_disp').replace('pkl', 'txt')).replace('salma-hand-obj-fix', 'hand-obj'))
+        # bb()
         if not jts3d_ann_pth.exists():
             print(f'Missing: {jts3d_ann_pth}')
             missing_poses_frms.append(jts3d_ann_pth)
             continue
-        _, jts3d_dope = load_dope_det_frm_pkl(pklpth)
+        if not check_dopefix_has_dets(pklpth):
+            print(f'Missing: {pklpth}')
+            missing_dope_dets.append(pklpth)
+            continue
+        _, jts3d_dope = load_dope_fix_det_frm_pkl(pklpth)
         # all_jts3d_dope.append(jts3d_dope)
 
         jts3d_ann = np.loadtxt(jts3d_ann_pth)
@@ -309,14 +323,8 @@ if __name__ == "__main__":
     # all_MPJPE = np.array(all_MPJPE)
     # all_MPJPE_PA = np.array(all_MPJPE_PA)
 
-    # compute errors
-    # MPJPE, MPJPE_PA = compute_errors(preds3d=all_jts3d_dope, gt3ds=all_jts3d_ann)
     print(f"MPJPE eval on {len(all_MPJPE)} frames: {np.mean(all_MPJPE)} m")    
     print(f"MPJPE_PA eval on {len(all_MPJPE_PA)}: {np.mean(all_MPJPE_PA)} m")    
-
-
-    
-
     print('Done!!')
 
 

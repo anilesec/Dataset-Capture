@@ -1,4 +1,6 @@
 import os, glob
+import pwd
+from evaluation.viz_utils import axis_angle_from_rotation
 import numpy as np
 import pickle
 from tqdm import tqdm
@@ -53,7 +55,7 @@ def load_dope_poses(dets_pkls_dir):
     @param dets_pkls_dir: path to pkls dir of a sequence
     @return poses_2d, poses_3d: 2d poses and 3d poses
     """
-    # load the pkl files and save the 2D and 3D detections
+    # load the pkl files and  the 2D and 3D detections
     pkls_pths = sorted(glob.glob(os.path.join(dets_pkls_dir, '*')))
     # print(f"Loading dope detections .. at {dets_pkls_dir}")
     poses_3d = []
@@ -111,6 +113,11 @@ def trnsfm_points(trnsfm, pts):
     return pts
 
 trnsfm2homat = lambda t: np.vstack((t, [0., 0., 0., 1.]))
+
+def saveas_pkl(data, path):
+    with open(path, 'wb') as f:
+        pickle.dump(data, f)
+
 
 def load_ann_jts(sqn_dir, disp=None):
     if disp == True:
@@ -207,6 +214,59 @@ def compute_similarity_transform(S1, S2, return_transfom=False, mu_idx=None, sca
 
     return S1_hat
 
+
+def check_dopefix_has_dets(pkl_pth):
+    pkl_data = load_pkl(pkl_pth)
+    dets = pkl_data['ppi_handexp_output']
+    if len(dets) == 0:
+        return False 
+    elif dets[0]['pose2d'].shape == (21, 2) and dets[0]['pose3d'].shape == (21, 3):
+        return True
+    else:
+        raise NotImplementedError
+
+
+
+# def load_dope_fix_dets_from_pkls(pkls_pths):
+#     all_dets = []
+#     all_jts2d = []
+#     all_jts3d = []
+#     for idx, pkl_pth in tqdm(enumerate(pkls_pths)):
+#         pkl_data = load_pkl(pkl_pth)
+#         dets = pkl_data['ppi_handexp_output']
+#         if len(dets) == 0:
+#             dets = None
+#             all_jts2d.append(None)
+#             all_jts3d.append(None)
+#         else:
+#             all_dets.append(dets)
+#             all_jts2d.append(dets['pose2d'])
+#             all_jts3d.append(dets['pose3d'])
+        
+#     all_jts2d = np.array(all_jts2d)
+#     all_jts3d = np.array(all_jts3d)
+
+#     miss_dets_inds = all_dets.index(None)
+#     bb()
+#     window = 5
+#     N = len(all_jts2d)
+#     # median filtering for missing dets
+#     for mind in miss_dets_inds:
+#         if (mind < window) or (mind > N - window):
+#             all_jts2d[mind] = np.median(all_jts2d[:window], axis=0)
+#             all_jts3d[mind] = np.median(all_jts3d[:window], axis=0)
+#         else:
+#             all_jts3d[mind] = np.median(all_jts3d[mind - window : mind + window], axis=0)
+    
+#     return all_jts2d, all_jts3d
+
+
+
+def load_dope_fix_det_frm_pkl(pkl_pth):
+    pkl_data = load_pkl(pkl_pth)
+    dets = pkl_data['ppi_handexp_output']
+
+    return dets[0]['pose2d'], dets[0]['pose3d']
 
 def load_dope_det_frm_pkl(pkl_pth):
     pkl_data = load_pkl(pkl_pth)

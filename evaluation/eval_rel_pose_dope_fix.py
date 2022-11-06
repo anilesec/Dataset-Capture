@@ -1,4 +1,3 @@
-from evaluation.eval_recon import saveas_pkl
 import numpy as np
 import os, sys, glob
 from ipdb import set_trace as bb
@@ -18,6 +17,7 @@ CAM_INTR = np.array(
             [  0.   ,   0.   ,   1.   ]]
    )
 RES_DIR = pathlib.Path('/scratch/1/user/aswamy/data/hand-obj')
+DOPE_DETS_FIX_DIR = pathlib.Path('/scratch/1/user/aswamy/data/salma-hand-obj-fix')
 
 
 def compute_relp_cam_from_jts3d(all_jts3d_cam, rel_type=None):
@@ -151,7 +151,9 @@ if __name__ == "__main__":
         
         # all_poses_ann_pths = sorted(glob.glob(osp.join(RES_DIR, sqn, 'icp_res/*/f_trans.txt')))
         
-        all_dope_pkls_pths = sorted(glob.glob(osp.join(RES_DIR, sqn, 'dope_dets/*.pkl')))
+        # all_dope_pkls_pths = sorted(glob.glob(osp.join(DOPE_DETS_FIX_DIR, sqn, 'handexp_dets/*.pkl')))
+        # all_jts2d, all_jts3d = load_dope_fix_dets_from_pkls(all_dope_pkls_pths)
+
         all_jts2d_ann_pths = sorted(glob.glob(osp.join(RES_DIR, sqn, 'proj_jts/*.txt')))
         all_jts3d_ann_pths = sorted(glob.glob(osp.join(RES_DIR, sqn, 'jts3d/*.txt')))
 
@@ -165,12 +167,14 @@ if __name__ == "__main__":
         save_dict = dict()
         print('Load Dope dets and Annotated jts...')
         for j2d_annp, j3d_annp in zip(all_jts2d_ann_pths, all_jts3d_ann_pths):
-            dope_pkl_pth = pathlib.Path((j3d_annp.replace('jts3d', 'dope_dets')).replace('txt', 'pkl'))
-            if not dope_pkl_pth.exists():
+            dope_pkl_pth = pathlib.Path(osp.join(DOPE_DETS_FIX_DIR, sqn, 'handexp_dets', osp.basename(j3d_annp)).replace('txt', 'pkl'))
+            # bb()
+            if not dope_pkl_pth.exists() or not check_dopefix_has_dets(dope_pkl_pth):
                 print(f'Missing dope det: {dope_pkl_pth}')
                 missing_dets_frms.append(dope_pkl_pth) 
                 continue
-            jts2d_dope, jts3d_dope = load_dope_det_frm_pkl(dope_pkl_pth)
+                
+            jts2d_dope, jts3d_dope = load_dope_fix_det_frm_pkl(dope_pkl_pth)
             all_jts2d_dope.append(jts2d_dope)
             all_jts3d_dope.append(jts3d_dope)
 
@@ -269,7 +273,7 @@ if __name__ == "__main__":
             'RTE_mean' : np.mean(all_jts3d_prcrst_pose_rel_tran_err),
             'missing_det_info': all_missing_dets_info
         }
-        save_dict_pth = osp.join(RES_DIR, sqn, 'eval_rel_pose_dope.pkl')
+        save_dict_pth = osp.join(RES_DIR, sqn, 'eval_rel_pose_dope_fix.pkl')
         saveas_pkl(save_dict, save_dict_pth)
         print(f"save here: {save_dict_pth}")
         
@@ -350,5 +354,3 @@ if __name__ == "__main__":
     print('Avg of mean-RTE of all seqs:', all_seqs_mean_RTE.mean())
 
     print('Done!')
-
-

@@ -122,6 +122,7 @@ def calc_3d_metric_VH(rec_meshfile, gt_meshfile, align=False, sampl_num=100000, 
     3D reconstruction metric.
 
     """
+    # bb()
     mesh_rec = trimesh.load(rec_meshfile, process=False)
     mesh_gt = trimesh.load(gt_meshfile, process=False)
 
@@ -195,7 +196,8 @@ def calc_3d_metric_VH(rec_meshfile, gt_meshfile, align=False, sampl_num=100000, 
             'precision_ratio_rec' :precision_ratio_rec,
             'completion_ratio_rec' : completion_ratio_rec,
             'fscore' : fscore,
-            'normal_acc' : normal_comp,
+            'normal_acc' : normal_acc,
+            'normal_comp' : normal_comp,
             'normal_avg' : normal_avg,
             # 'ch_dist': ch_dist
     }
@@ -330,10 +332,9 @@ def calc_2d_metric(rec_meshfile, gt_meshfile, align=False, n_imgs=1000):
 
 
 if __name__ == '__main__':
-
-    # parser = argparse.ArgumentParser(
-    #     description='Arguments to evaluate the reconstruction.'
-    # )
+    parser = argparse.ArgumentParser(
+        description='Arguments to evaluate the reconstruction.'
+    )
     # parser.add_argument('--rec_mesh', type=str,
     #                     help='reconstructed mesh file path')
     # parser.add_argument('--gt_mesh', type=str,
@@ -342,23 +343,22 @@ if __name__ == '__main__':
     #                     help='viz the errors on pcds')
     # parser.add_argument('--save', type=str, default=0, 
     #                     help='save or not')
-    # parser.add_argument('--sampl_num', type=int, default=200000, 
-    #                     help='no of pts to sampel on surface')
-    # args = parser.parse_args()
-
-    # print('Reconstruction evaluation execution...')
-    # for dth in tqdm(np.linspace(0.001, 0.015, 15)):
-    #     print(f'dist_thresh = {dth}')
-    #     calc_3d_metric(args.rec_mesh, args.gt_mesh, sampl_num=args.sampl_num, dist_thresh=dth, save_pkl=args.save)
-    # print('Done!')
+    parser.add_argument('--sample_num', type=int, default=200000, 
+                        help='no of pts to sampel on surface')
+    parser.add_argument('--sqn', type=str, default=None, help='')
+    args = parser.parse_args()
 
     VH_RECON_RES_DIR = '/scratch/1/user/vleroy/HandOBJ/VH_run1'
     SAVE_DIR = '/scratch/1/user/aswamy/data/vh_recon_res'
     RES_DIR = '/scratch/1/user/aswamy/data/hand-obj'
-    SAMPLE_NUM = 200000
 
     # get all sqn ids
     all_sqn_ids = os.listdir(VH_RECON_RES_DIR)
+
+    if args.sqn is not None:
+        assert args.sqn in all_sqn_ids, f"{args.sqn} is not present in listed sequences!!!"
+        all_sqn_ids = [args.sqn]
+
     miss_gt_meshes = []
     for sqn in tqdm(all_sqn_ids):
         print(f'sqn: {sqn}')
@@ -376,7 +376,7 @@ if __name__ == '__main__':
 
         for dth in tqdm(np.linspace(0.001, 0.015, 15)):
             print(f'dist_thresh = {dth:.5f}')
-            calc_3d_metric_VH(rec_mesh_pth, gt_mesh_pth, sampl_num=SAMPLE_NUM,
+            calc_3d_metric_VH(rec_mesh_pth, gt_mesh_pth, sampl_num=args.sample_num,
              dist_thresh=dth, save_pkl=True, save_seq_dir=osp.join(SAVE_DIR, sqn))
     
     print("all_sqn_ids", all_sqn_ids)
