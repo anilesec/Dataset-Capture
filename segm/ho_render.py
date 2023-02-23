@@ -1137,7 +1137,7 @@ def render_mesh_to_all_frames(mesh_pth, save_base_dir, sqn_res_dir, image_size =
         verts_up = torch.cat([verts, torch.ones_like(verts[...,-1:])], -1)
         verts_up = mat.reshape(-1,4,4) @ verts_up.reshape(-1,4,1)
         verts_up = verts_up[:,:3,0]
-        bb()
+        # bb()
         # rendering the mesh - no texture
         
         img_mesh, dimg_mesh = renderer.renderPerspective(vertices=[verts_up.to(device)],
@@ -1163,6 +1163,88 @@ def render_mesh_to_all_frames(mesh_pth, save_base_dir, sqn_res_dir, image_size =
         os.makedirs(osp.dirname(fn_dimg), exist_ok=True)
         Image.fromarray(dimg_mesh[:, :, 0]).save(fn_dimg)   
 
+@torch.no_grad()
+def render_comb_mesh(comb_mesh, save_base_dir, sqn_res_dir, image_size = 1280, t_start=0, t_end=1000000):
+    verts = comb_mesh.verts_list()[0]
+    faces = comb_mesh.faces_list()[0]
+
+    # rescale to meters
+    if (verts.max() - verts.min()) > 1:
+        print('rescale')
+        verts = verts / 1000.
+    else:
+        pass
+
+    os.makedirs(save_base_dir, exist_ok=True)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    renderer = PyTorch3DRenderer(image_size=image_size,
+                 blur_radius=0.00001,
+                 faces_per_pixel=1,
+                 bg_blending_radius=0,
+                #  background_color=(0, 0, 0),
+                 background_color=(255, 255, 255),
+    ).to(device)
+    dist, elev, azim = 0.00001, 0., 180
+    rotation, cam = look_at_view_transform(dist=dist, elev=elev, azim=azim)
+
+    pose_dir = osp.join(sqn_res_dir, 'icp_res')
+    rgb_dir = osp.join(sqn_res_dir, 'rgb')
+    rgb_imgs = os.listdir(rgb_dir)
+    rgb_imgs.sort()
+    subdirs = os.listdir(pose_dir)
+    subdirs.sort()
+    
+    intrinsics = np.array(
+            [[899.783,   0.   , 653.768],
+            [  0.   , 900.019, 362.143],
+            [  0.   ,   0.   ,   1.   ]]
+    )
+
+    resln = torch.Tensor([1280, 720]).float()
+    ratio_render = resln[0] / image_size
+    delta = int(((resln[0] - resln[1]) // 2) / ratio_render)
+    principal_point = ((torch.from_numpy(intrinsics[:2,-1]) / resln - 0.5) * 2).reshape(1,2)
+    focal_length = torch.Tensor([[(2 * intrinsics[0,0] / resln[0]), (2 * intrinsics[1,1] / resln[0])]]) # TODO check documentation
+    # bb()
+    subdirs = subdirs[t_start:t_end]
+
+    for t, subdir in enumerate(tqdm(subdirs)):
+        # update the mesh according to the homogenous matrix
+        fname = os.path.join(pose_dir, subdir, 'f_trans.txt')
+        mat = torch.from_numpy(np.loadtxt(fname)).float()
+        mat = torch.inverse(mat)
+        verts_up = torch.cat([verts, torch.ones_like(verts[...,-1:])], -1)
+        verts_up = mat.reshape(-1,4,4) @ verts_up.reshape(-1,4,1)
+        verts_up = verts_up[:,:3,0]
+        # bb()
+        # rendering the mesh - no texture
+        texture = comb_mesh.textures.verts_features_list()[0]
+        img_mesh, dimg_mesh = renderer.renderPerspective(vertices=[verts_up.to(device)],
+                                            faces=[faces.to(device)],
+                                            color=[texture.to(device)],
+                                            rotation=rotation.to(device),
+                                            camera_translation=cam.to(device),
+                                            principal_point=principal_point.to(device),
+                                            focal_length=focal_length,
+                                            # faces_uvs=[faces_uvs.to(device)],
+                                            # verts_uvs=[verts_uvs.to(device)],
+                                            )
+        
+        img_mesh = img_mesh.cpu().numpy()[0][delta : -delta]
+        dimg_mesh = dimg_mesh.cpu().numpy()[delta : -delta]
+        # dimg_mesh = ((dimg_mesh - dimg_mesh.min()) / (dimg_mesh.max() - dimg_mesh.min())*255).astype(np.uint8)
+        dimg_mesh = (dimg_mesh * 255).astype(np.uint8)
+
+        fn_img = os.path.join(save_base_dir, 'images', f"{t:06d}.jpg")
+        os.makedirs(osp.dirname(fn_img), exist_ok=True)
+        Image.fromarray(img_mesh).save(fn_img)
+        fn_dimg = os.path.join(save_base_dir, 'depth', f"{t:06d}_depth.jpg")
+        os.makedirs(osp.dirname(fn_dimg), exist_ok=True)
+        Image.fromarray(dimg_mesh[:, :, 0]).save(fn_dimg)   
+
+
+
 
 @torch.no_grad()
 def render_ho_frames(sqn='20220705173214', create_vid=False):
@@ -1176,25 +1258,25 @@ def render_ho_frames(sqn='20220705173214', create_vid=False):
 
     obj_renders_save_dir = osp.join(TMP_SAVE_DIR, sqn, 'obj')
     hand_renders_save_dir = osp.join(TMP_SAVE_DIR, sqn, 'hand')
-    bb()
-    # obj_vertices_, obj_faces_, obj_texcoords_, obj_texInd_, obj_texture_ = load_mesh(osp.dirname(obj_mesh_pth), osp.basename(obj_mesh_pth))
-    # obj_faces = torch.from_numpy(np.array(obj_faces_, dtype=np.int32))
-    # obj_verts = torch.from_numpy(obj_vertices_).float()
-    # obj_texture = pytorch3d.renderer.TexturesVertex(verts_features=torch.repeat_interleave(torch.tensor([1, 0, 0]).unsqueeze(0), obj_vertices_.shape[0], 0).unsqueeze(0))
-    # obj_mesh = pytorch3d.structures.Meshes(verts=[obj_verts], faces=[obj_faces], textures=obj_texture)
     
-    # hand_vertices_, hand_faces_, hand_texcoords_, hand_texInd_, hand_texture_ = load_mesh(osp.dirname(hand_mesh_pth), osp.basename(hand_mesh_pth))
-    # hand_faces = torch.from_numpy(np.array(hand_faces_, dtype=np.int32))
-    # hand_verts = torch.from_numpy(hand_vertices_).float()
-    # hand_texture = pytorch3d.renderer.TexturesVertex(verts_features=torch.repeat_interleave(torch.tensor([0, 1, 0]).unsqueeze(0), hand_vertices_.shape[0], 0).unsqueeze(0))
-    # hand_mesh = pytorch3d.structures.Meshes(verts=[hand_verts], faces=[hand_faces], textures=hand_texture)
+    obj_vertices_, obj_faces_, obj_texcoords_, obj_texInd_, obj_texture_ = load_mesh(osp.dirname(obj_mesh_pth), osp.basename(obj_mesh_pth))
+    obj_faces = torch.from_numpy(np.array(obj_faces_, dtype=np.int32))
+    obj_verts = torch.from_numpy(obj_vertices_).float()
+    obj_texture = pytorch3d.renderer.TexturesVertex(verts_features=torch.repeat_interleave(torch.tensor([1, 0, 0]).unsqueeze(0), obj_vertices_.shape[0], 0).unsqueeze(0))
+    obj_mesh = pytorch3d.structures.Meshes(verts=[obj_verts], faces=[obj_faces], textures=obj_texture)
+    
+    hand_vertices_, hand_faces_, hand_texcoords_, hand_texInd_, hand_texture_ = load_mesh(osp.dirname(hand_mesh_pth), osp.basename(hand_mesh_pth))
+    hand_faces = torch.from_numpy(np.array(hand_faces_, dtype=np.int32))
+    hand_verts = torch.from_numpy(hand_vertices_).float()
+    hand_texture = pytorch3d.renderer.TexturesVertex(verts_features=torch.repeat_interleave(torch.tensor([0, 1, 0]).unsqueeze(0), hand_vertices_.shape[0], 0).unsqueeze(0))
+    hand_mesh = pytorch3d.structures.Meshes(verts=[hand_verts], faces=[hand_faces], textures=hand_texture)
+    
+    comb_mesh = pytorch3d.structures.join_meshes_as_scene([hand_mesh, obj_mesh])
     # bb()
-    # comb_mesh = pytorch3d.structures.join_meshes_as_scene([hand_mesh, obj_mesh])
-
-
+    render_comb_mesh(comb_mesh, obj_renders_save_dir, sqn_res_dir, image_size = 1280, t_start=0, t_end=1000000)
     # render
-    render_mesh_to_all_frames(obj_mesh_pth, obj_renders_save_dir, sqn_res_dir, image_size = 1280, t_start=0, t_end=1000000)
-    render_mesh_to_all_frames(hand_mesh_pth, hand_renders_save_dir, sqn_res_dir, image_size = 1280, t_start=0, t_end=1000000)
+    # render_mesh_to_all_frames(obj_mesh_pth, obj_renders_save_dir, sqn_res_dir, image_size = 1280, t_start=0, t_end=1000000)
+    # render_mesh_to_all_frames(hand_mesh_pth, hand_renders_save_dir, sqn_res_dir, image_size = 1280, t_start=0, t_end=1000000)
 
     # create video
     if create_vid:
