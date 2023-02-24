@@ -19,6 +19,9 @@ from tqdm import tqdm
 import math
 import roma
 from ipdb import set_trace as bb
+from pytorch3d.renderer import (
+    PointLights,
+)
 osp = os.path
 MANO_DATA_DIR = "/scratch/1/user/aswamy/data/hand-obj/mano_fitting_data_texture"
 RES_DIR = "/scratch/1/user/aswamy/data/hand-obj"
@@ -302,15 +305,15 @@ class PyTorch3DRenderer(torch.nn.Module):
 
     def add_light_and_render(self, meshes, cameras):
         # Create light
-        lights = pytorch3d.renderer.DirectionalLights(
-            ambient_color=((self.ambient_color, self.ambient_color, self.ambient_color),),
-            diffuse_color=((self.diffuse_color, self.diffuse_color, self.diffuse_color),),
-            specular_color=(
-                (self.specular_color, self.specular_color, self.specular_color),),
-            direction=((0, 0, -1.0),),
-            # direction=((0, 1.0, 0.),),
-            device=meshes.device)
-
+        # lights = pytorch3d.renderer.DirectionalLights(
+        #     ambient_color=((self.ambient_color, self.ambient_color, self.ambient_color),),
+        #     diffuse_color=((self.diffuse_color, self.diffuse_color, self.diffuse_color),),
+        #     specular_color=(
+        #         (self.specular_color, self.specular_color, self.specular_color),),
+        #     direction=((0, 0, -1.0),),
+        #     # direction=((0, 1.0, 0.),),
+        #     device=meshes.device)
+        lights = PointLights(device=meshes.device, ambient_color=[[1.0, 1.0, 1.0]], diffuse_color=[[0, 0, 0]], specular_color=[[0, 0, 0]], location=((0, 0, 0), ))
         images, frags = self.renderer(meshes, cameras=cameras, lights=lights)
         
         # dimg = (frags.zbuf[0].cpu().detach().numpy().squeeze(-1) * 255).astype(np.uint8)
@@ -1182,8 +1185,8 @@ def render_comb_mesh(comb_mesh, save_base_dir, sqn_res_dir, image_size = 1280, t
                  blur_radius=0.00001,
                  faces_per_pixel=1,
                  bg_blending_radius=0,
-                #  background_color=(0, 0, 0),
-                 background_color=(255, 255, 255),
+                 background_color=(0, 0, 0),
+                #  background_color=(255, 255, 255),
     ).to(device)
     dist, elev, azim = 0.00001, 0., 180
     rotation, cam = look_at_view_transform(dist=dist, elev=elev, azim=azim)
@@ -1236,12 +1239,12 @@ def render_comb_mesh(comb_mesh, save_base_dir, sqn_res_dir, image_size = 1280, t
         # dimg_mesh = ((dimg_mesh - dimg_mesh.min()) / (dimg_mesh.max() - dimg_mesh.min())*255).astype(np.uint8)
         dimg_mesh = (dimg_mesh * 255).astype(np.uint8)
 
-        fn_img = os.path.join(save_base_dir, 'images', f"{t:06d}.jpg")
+        fn_img = os.path.join(save_base_dir, 'images', f"{t:010d}.png")
         os.makedirs(osp.dirname(fn_img), exist_ok=True)
         Image.fromarray(img_mesh).save(fn_img)
-        fn_dimg = os.path.join(save_base_dir, 'depth', f"{t:06d}_depth.jpg")
-        os.makedirs(osp.dirname(fn_dimg), exist_ok=True)
-        Image.fromarray(dimg_mesh[:, :, 0]).save(fn_dimg)   
+        # fn_dimg = os.path.join(save_base_dir, 'depth', f"{t:06d}_depth.png")
+        # os.makedirs(osp.dirname(fn_dimg), exist_ok=True)
+        # Image.fromarray(dimg_mesh[:, :, 0]).save(fn_dimg)   
 
 
 
@@ -1256,8 +1259,9 @@ def render_ho_frames(sqn='20220705173214', create_vid=False):
     obj_mesh_pth = osp.join(MANO_RES_DIR, sqn, 'object.obj')
     hand_mesh_pth = osp.join(MANO_RES_DIR, sqn, 'mano.obj')
 
-    obj_renders_save_dir = osp.join(TMP_SAVE_DIR, sqn, 'obj')
-    hand_renders_save_dir = osp.join(TMP_SAVE_DIR, sqn, 'hand')
+    # obj_renders_save_dir = osp.join(TMP_SAVE_DIR, sqn, 'obj')
+    # hand_renders_save_dir = osp.join(TMP_SAVE_DIR, sqn, 'hand')
+    renders_save_dir = osp.join(TMP_SAVE_DIR, sqn, 'ho')
     
     obj_vertices_, obj_faces_, obj_texcoords_, obj_texInd_, obj_texture_ = load_mesh(osp.dirname(obj_mesh_pth), osp.basename(obj_mesh_pth))
     obj_faces = torch.from_numpy(np.array(obj_faces_, dtype=np.int32))
@@ -1268,12 +1272,12 @@ def render_ho_frames(sqn='20220705173214', create_vid=False):
     hand_vertices_, hand_faces_, hand_texcoords_, hand_texInd_, hand_texture_ = load_mesh(osp.dirname(hand_mesh_pth), osp.basename(hand_mesh_pth))
     hand_faces = torch.from_numpy(np.array(hand_faces_, dtype=np.int32))
     hand_verts = torch.from_numpy(hand_vertices_).float()
-    hand_texture = pytorch3d.renderer.TexturesVertex(verts_features=torch.repeat_interleave(torch.tensor([0, 1, 0]).unsqueeze(0), hand_vertices_.shape[0], 0).unsqueeze(0))
+    hand_texture = pytorch3d.renderer.TexturesVertex(verts_features=torch.repeat_interleave(torch.tensor([0, 0, 1]).unsqueeze(0), hand_vertices_.shape[0], 0).unsqueeze(0))
     hand_mesh = pytorch3d.structures.Meshes(verts=[hand_verts], faces=[hand_faces], textures=hand_texture)
     
     comb_mesh = pytorch3d.structures.join_meshes_as_scene([hand_mesh, obj_mesh])
     # bb()
-    render_comb_mesh(comb_mesh, obj_renders_save_dir, sqn_res_dir, image_size = 1280, t_start=0, t_end=1000000)
+    render_comb_mesh(comb_mesh, renders_save_dir, sqn_res_dir, image_size = 1280, t_start=0, t_end=1000000)
     # render
     # render_mesh_to_all_frames(obj_mesh_pth, obj_renders_save_dir, sqn_res_dir, image_size = 1280, t_start=0, t_end=1000000)
     # render_mesh_to_all_frames(hand_mesh_pth, hand_renders_save_dir, sqn_res_dir, image_size = 1280, t_start=0, t_end=1000000)
