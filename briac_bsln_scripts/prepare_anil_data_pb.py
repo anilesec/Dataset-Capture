@@ -24,6 +24,18 @@ width = 1280
 height = 720
 stride  = 7
 
+def parseCameraPoses_dope_improved(path):
+    print('Using dope poses...')
+    global nbCams
+    import glob
+    pths = sorted(glob.glob(os.path.join(path, '*.txt')))
+    assert len(pths) > 0
+    transforms = np.array(
+        [np.linalg.inv(np.loadtxt(pth)) for pth in pths]
+    )
+    return transforms
+
+
 def parseCameraPoses_dope(path):
     print('Using dope poses...')
     global nbCams
@@ -33,6 +45,16 @@ def parseCameraPoses_dope(path):
     transforms = np.array(
         [np.linalg.inv(np.loadtxt(pth)) for pth in pths]
     )
+    return transforms
+
+def parseCameraPoses_posebert(path, sqn):
+    print('Using psoebert poses...')
+    global nbCams
+    import glob
+    pose_pth = os.path.join(path, f'{sqn}.npy')
+    
+    transforms = np.linalg.inv(np.load(pose_pth))
+
     return transforms
 
 def parseCameraPoses_colmap(path):
@@ -246,7 +268,7 @@ def createSceneSettings(outDir):
 
 scenes = os.listdir(dir)
 print(scenes)
-scenes = ["20220905142354"]
+scenes = ["20220909114359"]
 print(scenes)
 for scene in scenes:
     print("Preparing scene: " + scene)
@@ -254,7 +276,12 @@ for scene in scenes:
     # transforms = parseCameraPoses(path)
     # transforms = parseCameraPoses_colmap(path)
     transforms = parseCameraPoses_dope(path)
-
+    # pose_path = '/home/aswamy/server_mounts/scratch1/user/fbaradel/ROAR/relative_camera_poses/posebert_dope'
+    # transforms = parseCameraPoses_posebert(path=pose_path, sqn=scene)
+    # dope_imroved_pth = f"/home/aswamy/server_mounts/scratch1/user/fbaradel/ROAR/relative_camera_poses/dope_dope_pnp/{scene}"
+    # print(dope_imroved_pth)
+    # transforms = parseCameraPoses_dope_improved(dope_imroved_pth)
+    
     writeCalib(path, transforms, "calib.xml")
     writeSequence(path, transforms)
     makeBackgrounds(path, transforms)
