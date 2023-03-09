@@ -1,5 +1,9 @@
 from copy import deepcopy
+from lib2to3.pgen2.pgen import DFAState
+from re import L
 from xml.etree.ElementTree import TreeBuilder
+from evaluation.eval_utils import RES_DIR
+from evaluation.viz_utils import saveas_json
 import numpy as np
 import matplotlib.pyplot as plt
 import glob, copy
@@ -132,7 +136,7 @@ if False:
 
 
 # select the largest companent and writing it back
-if True:
+if False:
     if __name__ == "__main__":
         import argparse
 
@@ -217,3 +221,104 @@ if False:
         os.makedirs(osp.dirname(fname), exist_ok=True)
         o3d.io.write_point_cloud(fname, pcd_o3d, write_ascii=True)
     print('Done!!') 
+
+
+
+
+if False:
+    pth = "/scratch/1/user/aswamy/data/colmap-hand-obj"
+    sqns = os.listdir(pth)
+    import pathlib
+    miss_sqns = []
+    for sqn in sqns:
+        p = pathlib.Path(osp.join(pth, sqn, 'sparse/0/cameras.bin'))
+        if not p.exists():
+            miss_sqns.append(sqn)
+
+    print('Miss sqns:', miss_sqns)
+
+
+# dataset sqs with subj anmes
+if True:
+    RES_DIR = "/scratch/1/user/aswamy/data/hand-obj"
+    all_seqs_tar_pths = glob.glob(f"{RES_DIR}/*.tar") 
+
+    all_sqns = []
+    for spth in all_seqs_tar_pths:
+        if os.path.isfile(spth):
+            all_sqns.append(osp.basename(spth.split('.')[0]))
+
+    all_dicts =  []
+    all_objs = []
+    all_objs_names = []
+    for sqn in all_sqns:
+        print(sqn)
+        gt_mesh_pth = sorted(glob.glob(osp.join(RES_DIR, sqn, 'gt_mesh/*.obj')))[0]
+        
+        if sqn == '20220705173214':
+            continue
+        print(gt_mesh_pth)
+        m_name = osp.basename(gt_mesh_pth)
+        # bb()
+        new_dict = {
+            'sqn' : sqn,
+            'subj' : m_name[:4],
+            'obj' : m_name.split('_')[1],
+            'obj_name' : m_name
+        }
+        all_objs.append(m_name.split('_')[1])
+        all_objs_names.append(m_name)
+
+        import pandas as pd
+        df = pd.DataFrame.from_dict([new_dict])
+        all_dicts.append(df)
+         
+    df_comb = pd.concat(all_dicts)
+    df_comb_save_pth = osp.join(RES_DIR, 'dataset_log.csv')
+    bb()
+    df_comb.to_csv(df_comb_save_pth)
+    print(f"Saved here: {df_comb_save_pth}")
+
+    my_dict = {i : all_objs.count(i) for i in all_objs}
+
+    for k in my_dict:
+        if my_dict[k] > 1:
+            print(k, my_dict[k])
+
+    print('Done!!')
+
+# colmap poses stats
+if False:
+    COLMAP_RESP_DIR = "/scratch/1/user/aswamy/data/colmap-hand-obj"
+    all_sqns = os.listdir(COLMAP_RESP_DIR)
+
+    all_dfs = []
+    for sqn in all_sqns:
+        print('sqn', sqn)
+        cps_pths = sorted(glob.glob(osp.join(COLMAP_RESP_DIR, sqn, 'cam_poses/*.txt')))
+        imgs_pths = sorted(glob.glob(osp.join(COLMAP_RESP_DIR, sqn, 'images/*.jpg')))
+    
+        df = {
+            'sqn' :sqn,
+            'miss_frms_num' : f"{len(cps_pths)}",
+            'total_frms' : f"{len(imgs_pths)}",
+            'det_ratio' : f"{len(cps_pths)/len(imgs_pths)}"
+        }
+        import pandas as pd
+        df = pd.DataFrame.from_dict([df])
+        all_dfs.append(df)
+
+    bb()
+    df_comb = pd.concat(all_dfs)
+    df_comb_save_pth = osp.join(RES_DIR, 'colmap_det_stats.csv')
+    df_comb.to_csv(df_comb_save_pth)
+    print('Done')
+
+
+# if True:
+#     # get all poses
+#     pose_pths = sorted(sorted(glob.glob('/home/aswamy/server_mounts/scratch1/user/aswamy/data/hand-obj/20220705173214/icp_res')))
+#     poses = []
+
+
+# small_objs = ['20220905111237', '20220902154737', '20220902111535', '20220909151546', '20220824105341', '20220902111409', '20220902151726', '20220909134639', '20220909120614', '20220905105332', '20220905112733', '20220913144436', '20220823115809', '20220902110304', '20220823114538', '20220829154032', '20220913154643', '20220909115705', '20220909152911', '20220909121541', '20220812172414']
