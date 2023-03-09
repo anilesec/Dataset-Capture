@@ -1,0 +1,7 @@
+SMPLX_DIR='/gfs/project/humans/SMPLX/models'
+INTERHAND_DIR = '/gfs/data/vision/HandPose/InterHand26M'
+ANIL_DIR='/tmp-network/user/aswamy/D435i_seqs'
+# PROJECT_DIR='/tmp-network/user/fbaradel/projects/ROAR'
+PROJECT_DIR='/scratch/1/user/fbaradel/ROAR'
+LOGS_DIR=PROJECT_DIR+'/logs'
+INTERHAND_PREPROCESS_DIR=PROJECT_DIR+'/data/interhand'
