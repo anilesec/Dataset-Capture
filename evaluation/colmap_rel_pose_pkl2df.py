@@ -35,7 +35,7 @@ if __name__ == "__main__":
         print(f"seq: {sqn}")
 
         # bb()
-        pkl_pth = pathlib.Path(osp.join(RES_DIR, sqn, 'eval_rel_pose_clmp.pkl'))
+        pkl_pth = pathlib.Path(osp.join(RES_DIR, sqn, 'eval_rel_pose_clmp_all.pkl'))
         if not pkl_pth.exists():
             missing_pkl_seqs.append(sqn)
             print(f'eval pkl not avaialable for seq: {missing_pkl_seqs}')

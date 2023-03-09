@@ -59,20 +59,31 @@ def write_vis_pcd(file, points, colors):
     pcd.colors = o3d.utility.Vector3dVector(colors)
     o3d.io.write_point_cloud(file, pcd)
 
-def get_align_transformation(rec_meshfile, gt_meshfile):
+def get_align_transformation(rec_meshfile, gt_meshfile, trnsfm_file):
     """
     Get the transformation matrix to align the reconstructed mesh to the ground truth mesh.
     """    
-    o3d_rec_mesh = o3d.io.read_triangle_mesh(rec_meshfile)
-    o3d_gt_mesh = o3d.io.read_triangle_mesh(gt_meshfile)
-    o3d_rec_pc = o3d.geometry.PointCloud(points=o3d_rec_mesh.vertices)
+    print('Aligning recon mesh to GT mesh...')
+    import pickle
+    with open (trnsfm_file, 'rb') as f:
+        trnsfm = pickle.load(f)
+
+    bb()
+    import open3d as o3d
+    o3d_rec_mesh = o3d.io.read_triangle_mesh(str(rec_meshfile))
+    o3d_gt_mesh = o3d.io.read_triangle_mesh(str(gt_meshfile))
+
+    new_verts = trnsfm['scale'] * trnsfm['rot'].dot(np.array(o3d_rec_mesh.vertices).T) + trnsfm['tran']
+    o3d_rec_pc = o3d.geometry.PointCloud(points=o3d.cuda.pybind.utility.Vector3dVector(new_verts.T))
+    # o3d_rec_pc = o3d.geometry.PointCloud(points=o3d_rec_mesh.vertices)
     o3d_gt_pc = o3d.geometry.PointCloud(points=o3d_gt_mesh.vertices)
     trans_init = np.eye(4)
-    threshold = 0.1
+    threshold = 0.2
     reg_p2p = o3d.pipelines.registration.registration_icp(
         o3d_rec_pc, o3d_gt_pc, threshold, trans_init,
         o3d.pipelines.registration.TransformationEstimationPointToPoint())
     transformation = reg_p2p.transformation
+    print('Registration result:', reg_p2p)
     return transformation
 
 
@@ -117,17 +128,31 @@ def nn_correspondance(verts1, verts2):
     return distances, indices
 
 
-def calc_3d_metric(rec_meshfile, gt_meshfile, align=False, sampl_num=100000, dist_thresh=None, save_pkl=None):
+def calc_3d_metric(rec_meshfile, gt_meshfile, align=False, sampl_num=100000, dist_thresh=None, save_pkl=None, init_trnsfm_pkl=None):
     """
     3D reconstruction metric.
 
     """
+    # bb()
     mesh_rec = trimesh.load(rec_meshfile, process=False)
     mesh_gt = trimesh.load(gt_meshfile, process=False)
 
+
     if align:
-        transformation = get_align_transformation(rec_meshfile, gt_meshfile)
-        mesh_rec = mesh_rec.apply_transform(transformation)
+        # center align the mesh_rec to gt_mesh
+        import pickle
+        with open (init_trnsfm_pkl, 'rb') as f:
+                trnsfm = pickle.load(f)
+
+        transformation = np.eye(4)
+        transformation[:3, :3] = trnsfm['rot']
+        transformation[:3, 3] = trnsfm['tran'].flatten()
+
+        new_verts = trnsfm['scale'] * trnsfm['rot'].dot(np.array(mesh_rec.vertices).T) + trnsfm['tran']
+        mesh_rec.vertices = new_verts.T
+        # transformation = get_align_transformation(rec_meshfile, gt_meshfile, init_trnsfm_pkl)
+        # mesh_rec = mesh_rec.apply_transform(transformation)
+
 
     # found the aligned bbox for the mesh
     to_align, _ = trimesh.bounds.oriented_bounds(mesh_gt)
@@ -203,7 +228,7 @@ def calc_3d_metric(rec_meshfile, gt_meshfile, align=False, sampl_num=100000, dis
 
     pprint.pprint(f'Evalutaion in cms and %: {tosave_dict}')
     if save_pkl:
-        pkl_save_pth = osp.join(osp.dirname(osp.dirname(rec_meshfile)), f"briac_recon_eval_sample{sampl_num}_dth_{dist_thresh:.4f}.pkl") 
+        pkl_save_pth = osp.join(osp.dirname(osp.dirname(rec_meshfile)), f"briac_dope_recon_eval_sample{sampl_num}_dth_{dist_thresh:.4f}.pkl") 
         saveas_pkl(tosave_dict, pkl_save_pth)
         print(f'saved here: {pkl_save_pth}')
 
@@ -261,7 +286,7 @@ def calc_2d_metric(rec_meshfile, gt_meshfile, align=False, n_imgs=1000):
 
     gt_mesh = o3d.io.read_triangle_mesh(gt_meshfile)
     rec_mesh = o3d.io.read_triangle_mesh(rec_meshfile)
-    bb()
+    # bb()
     unseen_gt_pointcloud_file = gt_meshfile.replace('.obj', '_pc_unseen.npy')
     pc_unseen = np.load(unseen_gt_pointcloud_file)
     if align:
@@ -342,12 +367,12 @@ if __name__ == '__main__':
     # parser.add_argument('--save', type=str, default=0, 
     #                     help='save or not')
     parser.add_argument('--sample_num', type=int, default=200000, 
-                        help='no of pts to sample on surface')
+                        help='no of pts to sampel on surface')
     parser.add_argument('--sqn', type=str, default=None, help='')
     args = parser.parse_args()
 
 
-    BRIAC_RECON_RES_DIR = '/scratch/1/user/aswamy/data/briac_baseline'
+    BRIAC_RECON_RES_DIR = '/scratch/1/user/aswamy/data/briac_recon_dopev2_poses_res'
     RES_DIR = '/scratch/1/user/aswamy/data/hand-obj'
     SAMPLE_NUM = 200000
 
@@ -367,7 +392,7 @@ if __name__ == '__main__':
     for sqn in tqdm(all_sqn_ids):
         print(f'sqn: {sqn}')
 
-        rec_mesh_pth = pathlib.Path(osp.join(BRIAC_RECON_RES_DIR, sqn, 'LOD0/mesh_0.ply'))
+        rec_mesh_pth = pathlib.Path(osp.join(BRIAC_RECON_RES_DIR, sqn, 'LOD2/mesh_0.ply'))
         gt_mesh_pth = pathlib.Path(glob.glob(osp.join(RES_DIR, sqn, 'gt_mesh/*.obj'))[0])
         
         if not gt_mesh_pth.exists():
@@ -377,10 +402,13 @@ if __name__ == '__main__':
 
         print(f'rec_mesh_pth: {rec_mesh_pth}')
         print(f'gt_mesh_pth: {gt_mesh_pth}')
-
-        for dth in tqdm(np.linspace(0.001, 0.015, 15)):
+        ths = [0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.010, 0.011, 0.012, 0.013, 0.014, 0.015]
+        # for dth in tqdm(np.linspace(0.005, 0.015, 10)):
+        for dth in tqdm(ths):
             print(f'dist_thresh = {dth:.5f}')
-            calc_3d_metric(rec_mesh_pth, gt_mesh_pth, sampl_num=SAMPLE_NUM, dist_thresh=dth, save_pkl=True)
+            init_trnsfm_pkl = osp.join(RES_DIR, sqn, 'dope_frm1_to_gt_trnsfm.pkl')
+            calc_3d_metric(rec_mesh_pth, gt_mesh_pth, align=True, sampl_num=args.sample_num,
+             dist_thresh=dth, save_pkl=True, init_trnsfm_pkl=init_trnsfm_pkl)
     
     print("all_sqn_ids", all_sqn_ids)
     print('Done')

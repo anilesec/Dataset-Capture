@@ -470,8 +470,14 @@ def draw_hand_jts_on_img(hand_jts, jts_order, img, color='r', linestyle='--', li
     canvas = FigureCanvas(fig)
     plt.imshow(img)
     plt.scatter(hand_jts[:, 0], hand_jts[:, 1], c=color, s=0.5)
-
-    if jts_order == 'CP':
+    if jts_order == 'MANO_FAB':
+        # Contactpose labels order
+        thumb_idxs = [0, 13, 14, 15, 16]
+        indxfing_idxs = [0, 1, 2, 3, 17]
+        midfing_idxs = [0, 4, 5, 6, 18]
+        ringfing_idxs = [0, 10, 11, 12, 19]
+        litfing_idxs = [0, 7, 8, 9, 20]    
+    elif jts_order == 'CP':
         # Contactpose labels order
         thumb_idxs = [0, 1, 2, 3, 4]
         indxfing_idxs = [0, 5, 6, 7, 8]
@@ -529,8 +535,14 @@ def viz_hand_jts3d(hand_jts, jts_order, grid_axis='ON', line_sz=2, dot_sz=2, ele
     fig = plt.figure()
     canvas = FigureCanvas(fig)
     ax = fig.add_subplot(projection='3d')
-
-    if jts_order == 'CP':
+    if jts_order == 'MANO_FAB':
+        # Contactpose labels order
+        thumb_idxs = [0, 13, 14, 15, 16]
+        indxfing_idxs = [0, 1, 2, 3, 17]
+        midfing_idxs = [0, 4, 5, 6, 18]
+        ringfing_idxs = [0, 10, 11, 12, 19]
+        litfing_idxs = [0, 7, 8, 9, 20]    
+    elif jts_order == 'CP':
         # hand skeleton structure
         # Contactpose labels order
         thumb_idxs = [0, 1, 2, 3, 4]

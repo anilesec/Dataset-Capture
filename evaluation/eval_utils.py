@@ -105,6 +105,8 @@ def trnsfm_points(trnsfm, pts):
     """
     if trnsfm.shape == (3, 4):
         trnsfm_hom = np.vstack([trnsfm, np.array([0, 0, 0, 1])])
+    else:
+        trnsfm_hom = trnsfm
 
     pts = np.vstack((pts.T, np.ones(len(pts))))
     pts = trnsfm_hom @ pts

@@ -1,3 +1,4 @@
+from telnetlib import XDISPLOC
 from evaluation.eval_recon import saveas_pkl
 import numpy as np
 import os, sys, glob
@@ -129,6 +130,8 @@ if __name__ == "__main__":
     #                     help='add(1) noise or not(0) to ann 3d jts')
     parser.add_argument('--filter', type=int, default=0, choices=[0, 1],
                         help='filter(1), not_filter(0)')
+    parser.add_argument('--save', type=int, default=0, choices=[0, 1],
+                        help='save(1), not save(0)')
 
     args = parser.parse_args()
 
@@ -150,7 +153,6 @@ if __name__ == "__main__":
         print(f"sqn: {sqn}")
         
         # all_poses_ann_pths = sorted(glob.glob(osp.join(RES_DIR, sqn, 'icp_res/*/f_trans.txt')))
-        
         all_dope_pkls_pths = sorted(glob.glob(osp.join(RES_DIR, sqn, 'dope_dets/*.pkl')))
         all_jts2d_ann_pths = sorted(glob.glob(osp.join(RES_DIR, sqn, 'proj_jts/*.txt')))
         all_jts3d_ann_pths = sorted(glob.glob(osp.join(RES_DIR, sqn, 'jts3d/*.txt')))
@@ -205,6 +207,13 @@ if __name__ == "__main__":
         all_r2c_trnsfms, all_jts3d_cam = compute_root2cam_ops(all_jts2d, all_jts3d)
         all_jts3d_prcrst_pose_rel, all_jts3d_prcrst_algnd = compute_relp_cam_from_jts3d(all_jts3d_cam, rel_type='REF')
 
+        import open3d as o3d
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.pybind.utility.Vector3dVector(all_jts3d_cam[0])
+        fpth = osp.join(RES_DIR, sqn, 'dope_jts3d_cam_frm1.ply')
+        o3d.io.write_point_cloud(fpth, pcd, write_ascii=True)
+        np.savetxt(fpth.replace('ply', 'txt'), all_jts3d_cam[0])
+        
         # REPRJ Error on r2cs
         projtd_jts2d = []
         for r2c, j3d in zip(all_r2c_trnsfms, all_jts3d):
@@ -272,6 +281,14 @@ if __name__ == "__main__":
         save_dict_pth = osp.join(RES_DIR, sqn, 'eval_rel_pose_dope.pkl')
         saveas_pkl(save_dict, save_dict_pth)
         print(f"save here: {save_dict_pth}")
+
+        if args.save:
+            # bb()
+            for idx, relp in tqdm(enumerate(all_jts3d_prcrst_pose_rel)):
+                relp_fpth = osp.join(RES_DIR, sqn, 'dope_rel_poses', f"{idx:010d}.txt")
+                os.makedirs(osp.dirname(relp_fpth), exist_ok=True)
+                np.savetxt(relp_fpth, relp)                            
+            print(f'saved rel-poses here: {osp.dirname(relp_fpth)}')
         
         # bb()
         if False:

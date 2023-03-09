@@ -12,10 +12,10 @@ import sys
 from evaluation.eval_utils import *
 from evaluation.viz_utils import *
 
-PCK_THRESH = 2.0
-AUC_MIN = 0.0
-AUC_MAX = 200.0
-NUM_SEQS = 87
+# PCK_THRESH = 0.01 # 1cm
+# AUC_MIN = 0.0
+# AUC_MAX = 200.0
+# NUM_SEQS = 87
 
 def ours2dope(**kwargs):
     return np.array([0, 1, 2, 3, 4, 5, 6, 11, 16, 7, 12, 17, 8, 13, 18, 9, 14, 19, 10, 15, 20])
@@ -179,7 +179,7 @@ def compute_errors(preds3d, gt3ds):
 
         # Joint errors for PCK Calculation
         # joint_error_maj = joint_error[SMPL_MAJOR_JOINT]
-        # errors_pck.append(joint_error_maj)
+        errors_pck.append(joint_error)
 
         # Compute MPJPE_PA and also store similiarity matrices to apply them later to rotation matrices for MPJAE_PA
         pred3d_sym, R = compute_similarity_transform(pred3d, gt3d)
@@ -190,7 +190,7 @@ def compute_errors(preds3d, gt3ds):
     
     # return np.mean(np.array(errors)), np.mean(np.array(errors_pa)), \
     #        np.stack(errors_pck, 0), np.stack(proc_rot, 0)
-    return np.mean(np.array(errors)), np.mean(np.array(errors_pa)), None, None
+    return np.mean(np.array(errors)), np.mean(np.array(errors_pa)), np.stack(errors_pck, 0), None
 
 def load_dope_poses_from_pkls(pkls_pths):
     """
@@ -251,7 +251,7 @@ def load_dope_det_frm_pkl(pkl_pth):
         elif dets[1]['hand_isright']:
             right_hand_id = 1
         else:
-            raise ValueError("Error!! Agrrrr!! Check your  conditional statements >_<")
+            raise ValueError("Error!! Agrrrr!! Check your stupid conditional statements >_<")
     else:
         right_hand_id = 0
     jts2d = (dets[right_hand_id]['pose2d'])
@@ -261,63 +261,112 @@ def load_dope_det_frm_pkl(pkl_pth):
 
 if __name__ == "__main__":
     RES_DIR = pathlib.Path('/scratch/1/user/aswamy/data/hand-obj')
-    # MPJPE and MPJPE_PA
-    # get all dope dets(pkls)
-    print('Listing all dope pkl files...')
-    all_dope_pkls = sorted(glob.glob(osp.join(RES_DIR, '*/dope_dets/*.pkl')))
 
-    all_jts3d_ann = []
-    all_jts3d_dope = []
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--sqn", type=str, help='seq no.')
+    args = parser.parse_args()
+
+    # select all the sids with .tar 
+    all_seqs_tar_pths = glob.glob(f"{RES_DIR}/*.tar")
+    all_sqns = []
+    for spth in all_seqs_tar_pths:
+        if os.path.isfile(spth):
+            all_sqns.append(osp.basename(spth.split('.')[0]))
+
+    if args.sqn is not None:
+        assert args.sqn in all_sqns, f"{args.sqn} is not present in listed sequences!!!"
+        all_sqns = [args.sqn]
+
+    print('Listing all rgbs..')
+    all_rgbs_pths = []
+    for sqn in tqdm(all_sqns):
+        print(f"sqn: {sqn}")
+        all_rgbs_pths.append(glob.glob(osp.join(RES_DIR, sqn, 'rgb/*.png')))
+
+    import itertools
+    all_rgbs_pths = list(itertools.chain(*all_rgbs_pths))
+
+    # compute PCK and AUC metrics
+    all_pck = []
+    missing_jts3d_ann_frms = []
+    missing_hocnet_dets = []
+    # all_jts3d_ann = []
+    # all_jts3d_hocnet = []
     all_MPJPE = []
     all_MPJPE_PA = []
     missing_poses_frms = []
-    for pklpth in tqdm(all_dope_pkls):
-        # bb()
-        # check if pose/3D jts exist for corresponding dope det
-        jts3d_ann_pth = pathlib.Path(pklpth.replace('dope_dets', 'jts3d_disp').replace('pkl', 'txt'))
+    for imgp in tqdm(all_rgbs_pths):
+        jts3d_hocnet_pth = pathlib.Path(imgp.replace('rgb', 'jts3d_hocnet').replace('png', 'txt'))
+        jts3d_ann_pth = pathlib.Path(imgp.replace('rgb', 'mano_jts').replace('png', 'txt'))
+
         if not jts3d_ann_pth.exists():
-            print(f'Missing: {jts3d_ann_pth}')
-            missing_poses_frms.append(jts3d_ann_pth)
+            print(f'Missing jts3d ann: {jts3d_ann_pth}')
+            missing_jts3d_ann_frms.append(jts3d_ann_pth)
             continue
-        _, jts3d_dope = load_dope_det_frm_pkl(pklpth)
-        # all_jts3d_dope.append(jts3d_dope)
 
-        jts3d_ann = np.loadtxt(jts3d_ann_pth)
-        # all_jts3d_ann.append(all_jts3d_ann)
-        # bb()
-        MPJPE, MPJPE_PA, _, _ = compute_errors(jts3d_dope.reshape(1, 21, 3), jts3d_ann[ours2dope()].reshape(1, 21, 3))
-        all_MPJPE.append(MPJPE)
-        all_MPJPE_PA.append(MPJPE_PA)
+        if not jts3d_hocnet_pth.exists():
+            print(f'Missing hocnet dets: {jts3d_hocnet_pth}')
+            missing_hocnet_dets.append(jts3d_hocnet_pth)
+            all_MPJPE.append(np.inf)
+            all_MPJPE_PA.append(np.inf)
+            all_pck.append(np.full((21, 1), np.inf))
+        else:
+            jts3d_hocnet = np.loadtxt(jts3d_hocnet_pth)
+            # all_jts3d_hocnet.append(jts3d_hocnet)
 
-        # img_dope = viz_hand_jts3d(jts3d_dope, 'DOPE', grid_axis='ON',
-        #             line_sz=2, dot_sz=4, elev=-90, azim=-90,
-        #             xlim=[jts3d_dope[:, 0].min() - 0.1, jts3d_dope[:, 0].max() + 0.1],
-        #             ylim=[jts3d_dope[:, 1].min() - 0.1, jts3d_dope[:, 1].max() + 0.1],
-        #             zlim=[jts3d_dope[:, 2].min() - 0.1, jts3d_dope[:, 2].max() + 0.1],
-        #             title='3D Joints in wrist frame')
-        # img_ann = viz_hand_jts3d(jts3d_ann, 'OURS', grid_axis='ON',
-        #             line_sz=2, dot_sz=4, elev=-90, azim=-90,
-        #             xlim=[jts3d_ann[:, 0].min() - 0.1, jts3d_ann[:, 0].max() + 0.1],
-        #             ylim=[jts3d_ann[:, 1].min() - 0.1, jts3d_ann[:, 1].max() + 0.1],
-        #             zlim=[jts3d_ann[:, 2].min() - 0.1, jts3d_ann[:, 2].max() + 0.1],
-        #             title='3D Joints in wrist frame')
-        # plt.imsave('./dope.png', img_dope)
-        # plt.imsave('./ann.png', img_ann)
-        # bb()
-    # all_jts3d_dope = np.array(all_jts3d_dope)
+            jts3d_ann = np.loadtxt(jts3d_ann_pth)
+
+            MPJPE, MPJPE_PA, errors_pck, _ = compute_errors(jts3d_hocnet.reshape(1, 21, 3), jts3d_ann.reshape(1, 21, 3))
+            all_MPJPE.append(MPJPE)
+            all_MPJPE_PA.append(MPJPE_PA)
+            # print(errors_pck.shape)
+            all_pck.append(errors_pck.reshape(21, 1))
+
+    # all_jts3d_hocnet = np.array(all_jts3d_hocnet)
     # all_jts3d_ann = np.array(all_jts3d_ann)
     # all_MPJPE = np.array(all_MPJPE)
     # all_MPJPE_PA = np.array(all_MPJPE_PA)
-
-    # compute errors
-    # MPJPE, MPJPE_PA = compute_errors(preds3d=all_jts3d_dope, gt3ds=all_jts3d_ann)
-    print(f"MPJPE eval on {len(all_MPJPE)} frames: {np.mean(all_MPJPE)} m")    
-    print(f"MPJPE_PA eval on {len(all_MPJPE_PA)}: {np.mean(all_MPJPE_PA)} m")    
-
-
     
+    all_pck = np.stack(all_pck, 0)
+    MPJPE_valid_cls = np.ma.masked_invalid(all_MPJPE)
+    all_MPJPE_valid_msk = np.logical_not(MPJPE_valid_cls.mask)
+    all_MPJPE_valid = np.array(all_MPJPE)[all_MPJPE_valid_msk]
 
+    MPJPE_PA_valid_cls = np.ma.masked_invalid(all_MPJPE_PA)
+    all_MPJPE_PA_valid_msk = np.logical_not(MPJPE_PA_valid_cls.mask)
+    all_MPJPE_PA_valid = np.array(all_MPJPE_PA)[all_MPJPE_PA_valid_msk]
+
+    # Joint errors and procrustes errors
+    print(f"MPJPE eval on {len(all_MPJPE)} frames: {np.sum(all_MPJPE_valid)/len(all_MPJPE):.6f} m")
+    print(f"MPJPE eval on {len(all_MPJPE_valid)} frames: {np.mean(all_MPJPE_valid):.6f} m")
+
+    print(f"MPJPE_PA eval on {len(all_MPJPE_PA)}: {np.sum(all_MPJPE_PA_valid)/ len(all_MPJPE_PA):.6f} m") 
+    print(f"MPJPE_PA eval on {len(all_MPJPE_PA_valid)}: {np.mean(all_MPJPE_PA_valid):.6f} m") 
+
+    print(f"missing_jts3d_ann_frms: Total: {len(missing_jts3d_ann_frms)}")   
+    print(f"missing_hocnet_dets: Total: {len(missing_hocnet_dets)}")
+
+    # bb()
+    # pck value
+    hocnet_pck_dict = dict()
+    for pck_th in [0.03]:
+        pck_final = compute_pck(all_pck, pck_th) * 100.
+        hocnet_pck_dict[f'{pck_th:.4f}'] = pck_final
+        print(f"PCK with thresh {pck_th:.4f}: {pck_final:.4f} %")   
+
+    # bb()
     print('Done!!')
+    # plot pck
+    # import matplotlib.pyplot as plt
+    # x_axis = [float(k) for k in hocnet_pck_dict.keys()]
+    # y_axis = [int(v) for v in hocnet_pck_dict.values()]
+    # plt.figure()
+    # plt.plot(x_axis, y_axis, '-r')
+    # plt.xlabel('')
+    # plt.ylabel('')
+    # plt.savefig(osp.join(RES_DIR, 'hocnet_pck.png'))
+    # print('Done!!')
 
 
 
