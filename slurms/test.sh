@@ -1,0 +1,12 @@
+#!/bin/bash
+
+dirs3="20220909140016 20220902163904 20220811170459 20220705173214 20220912155637 20220824142508 20220905140306 20220824160141 20220805165947 20220902114024"
+dirs10="20220907152036 20220905141444 20220812174356 20220912161552 20220909141430 20220824180652 20220909121541 20220819164041 20220912142017"
+
+for d in $dirs3;
+  do
+    echo "python /gfs-ssd/user/aswamy/github_repos/ROAR/Reconstruction/ransac_icp_colmap.py  --sqn  $d --save_pkl 1 --sample_num 20000"
+    python /gfs-ssd/user/aswamy/github_repos/ROAR/Reconstruction/ransac_icp_colmap.py  --sqn  $d --save_pkl 1 --sample_num 20000
+  done
+
+echo 'Done'
