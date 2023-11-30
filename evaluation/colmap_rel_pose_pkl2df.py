@@ -10,6 +10,7 @@ import numpy as np
 
 RES_DIR = pathlib.Path('/scratch/1/user/aswamy/data/hand-obj')
 
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser('compute relative poses')
@@ -32,6 +33,8 @@ if __name__ == "__main__":
     all_seqs_dict = []
     missing_pkl_seqs = []
     for sqn in tqdm(all_sqns[args.start_ind: args.end_ind]):
+        # if sqn == "20220805164755":
+        #     continue
         print(f"seq: {sqn}")
 
         # bb()
@@ -42,35 +45,50 @@ if __name__ == "__main__":
             continue
         else:
             data = load_pkl(pkl_pth)
+            
+            ths = [[4.0, 0.02], [10.0, 0.05], [20.0, 0.10]]
+            bins = []
+            for th in ths:
+                # bb()
+                bin_vals = np.logical_and(data['RRE'] <= th[0], data['RTE'][:-1] <= th[1])
+                bins.append(float(f"{np.average(bin_vals)*100:.2f}"))
             new_dict = {
                 'sqn' : data['sqn'],
-                'repr_mean' : None,
-                'rre_mean' : f"{np.mean(data['RRE']):.4f}",
-                'rre_med' : f"{np.median(data['RRE']):.4f}",
-                'rre_max' : f"{np.max(data['RRE']):.4f}",
-                'rre_min' : f"{np.min(data['RRE']):.4f}",
-                'rre_std' : f"{np.std(data['RRE']):.4f}",
-                'rre_25th' : f"{np.percentile(data['RRE'], [25, 50, 75, 90])[0]:.4f}",
-                'rre_50th' : f"{np.percentile(data['RRE'], [25, 50, 75, 90])[1]:.4f}",
-                'rre_75th' : f"{np.percentile(data['RRE'], [25, 50, 75, 90])[2]:.4f}",
-                'rre_95th' : f"{np.percentile(data['RRE'], [25, 50, 75, 90])[3]:.4f}",
-                'rte_mean' : f"{np.mean(data['RTE']):.4f}",
-                'rte_med' : f"{np.median(data['RTE']):.4f}",
-                'rte_max' : f"{np.max(data['RTE']):.4f}",
-                'rte_min' : f"{np.min(data['RTE']):.4f}",
-                'rte_std' : f"{np.std(data['RTE']):.4f}",
-                'rte_25th' : f"{np.percentile(data['RTE'], [25, 50, 75, 90])[0]:.4f}",
-                'rte_50th' : f"{np.percentile(data['RTE'], [25, 50, 75, 90])[1]:.4f}",
-                'rte_75th' : f"{np.percentile(data['RTE'], [25, 50, 75, 90])[2]:.4f}",
-                'rte_95th' : f"{np.percentile(data['RTE'], [25, 50, 75, 90])[3]:.4f}"    
+                f"rre_{ths[0][0]}_rte{ths[0][1]}" : bins[0], 
+                f"rre_{ths[1][0]}_rte{ths[1][1]}" : bins[1],
+                f"rre_{ths[2][0]}_rte{ths[2][1]}" : bins[2]  
             }
+            # new_dict = {
+            #     'sqn' : data['sqn'],
+            #     'repr_mean' : None,
+            #     'rre_mean' : f"{np.mean(data['RRE']):.4f}",
+            #     'rre_med' : f"{np.median(data['RRE']):.4f}",
+            #     'rre_max' : f"{np.max(data['RRE']):.4f}",
+            #     'rre_min' : f"{np.min(data['RRE']):.4f}",
+            #     'rre_std' : f"{np.std(data['RRE']):.4f}",
+            #     'rre_25th' : f"{np.percentile(data['RRE'], [25, 50, 75, 90])[0]:.4f}",
+            #     'rre_50th' : f"{np.percentile(data['RRE'], [25, 50, 75, 90])[1]:.4f}",
+            #     'rre_75th' : f"{np.percentile(data['RRE'], [25, 50, 75, 90])[2]:.4f}",
+            #     'rre_95th' : f"{np.percentile(data['RRE'], [25, 50, 75, 90])[3]:.4f}",
+            #     'rte_mean' : f"{np.mean(data['RTE']):.4f}",
+            #     'rte_med' : f"{np.median(data['RTE']):.4f}",
+            #     'rte_max' : f"{np.max(data['RTE']):.4f}",
+            #     'rte_min' : f"{np.min(data['RTE']):.4f}",
+            #     'rte_std' : f"{np.std(data['RTE']):.4f}",
+            #     'rte_25th' : f"{np.percentile(data['RTE'], [25, 50, 75, 90])[0]:.4f}",
+            #     'rte_50th' : f"{np.percentile(data['RTE'], [25, 50, 75, 90])[1]:.4f}",
+            #     'rte_75th' : f"{np.percentile(data['RTE'], [25, 50, 75, 90])[2]:.4f}",
+            #     'rte_95th' : f"{np.percentile(data['RTE'], [25, 50, 75, 90])[3]:.4f}"    
+            # }
 
             df = pd.DataFrame.from_dict([new_dict])
             all_seqs_dict.append(df)
-
+    bb()
     df_comb = pd.concat(all_seqs_dict)
 
-    df_comb_save_pth = osp.join(RES_DIR, 'all_valid_seqs_colmap_rel_pose_eval.csv')
+    df_comb_save_pth = osp.join(RES_DIR, 'all_valid_seqs_colmap_rel_pose_all_framepairs.csv')
     df_comb.to_csv(df_comb_save_pth)
     print(f"Saved here: {df_comb_save_pth}")
     print('Done!!')
+
+
