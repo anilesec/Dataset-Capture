@@ -34,13 +34,14 @@ if __name__ == "__main__":
     for sqn in tqdm(all_sqns[args.start_ind: args.end_ind]):
         print(f"seq: {sqn}")
         # get hand-obj img from slvless_img 
-        slvless_imgs_pths = sorted(glob.glob(osp.join(RES_DIR, sqn, 'midas_depth_masks_th_0.5_mskd_img/*.png')))
+        # slvless_imgs_pths = sorted(glob.glob(osp.join(RES_DIR, sqn, 'midas_depth_masks_th_0.5_mskd_img/*.png')))
+        slvless_imgs_pths = sorted(glob.glob(osp.join(RES_DIR, sqn, 'mask/*.png')))
 
         for slvless_imgp in tqdm(slvless_imgs_pths):
             slvless_img = cv2.imread(slvless_imgp)
             slvless_img_bin = get_bin_mask(im=slvless_img, th=0, val=255)
             
-            fn_slvless_img_bin = slvless_imgp.replace('midas_depth_masks_th_0.5_mskd_img', 'slvless_img_bin_midas')
+            fn_slvless_img_bin = slvless_imgp.replace('mask', 'mask_bin')
             os.makedirs(osp.dirname(fn_slvless_img_bin), exist_ok=True)
             cv2.imwrite(fn_slvless_img_bin, slvless_img_bin)
 
