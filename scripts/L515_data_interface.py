@@ -559,7 +559,7 @@ class L515DataInterface:
 
         pcds_pths = sorted(glob.glob(osp.join(self.inp_seq_dir, 'pointcloud', '*.xyz.npz')))[self.start_ind : self.end_ind]
         assert len(pcds_pths) > 0, f"No .xyz.npz files in given seq dir:{self.inp_seq_dir}"
-
+        bb()
         for pcdp in tqdm(pcds_pths):
             xyz_raw = dict(np.load(pcdp))['arr_0']
 
@@ -736,11 +736,12 @@ if __name__ == "__main__":
     depth_type='dist_xyz', start_ind=args.start_ind, end_ind=args.end_ind, slv_clr=SLV_COLOR,
     norm_type=args.norm_type, kms_max_iter=args.kms_max_iter, kms_eps=args.kms_eps,
     kms_num_clstrs=args.kms_num_clstrs, sqn=args.sqn)
-    # bb()
+    bb()
     
     # interface.create_npzs()
     # interface.save_rgbs()
-    # interface.save_masks()
+    interface.save_masks()
+    bb()
     # interface.save_slvless_masks()
     interface.rm_smlcomps_slvless_img()
 
