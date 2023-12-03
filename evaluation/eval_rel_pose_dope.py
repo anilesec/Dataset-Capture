@@ -148,7 +148,7 @@ if __name__ == "__main__":
 
     all_seqs_mean_RRE = []
     all_seqs_mean_RTE = []
-
+    # showme_test_seqs = ["20220812180133", "20220819155412", "20220819162529", "20220819164041", "20220902163904", "20220902163950", "20220902164854", "20220902170443", "20220913144436", "20220913145135"]
     for sqn in tqdm(all_sqns):
         print(f"sqn: {sqn}")
         
@@ -201,18 +201,16 @@ if __name__ == "__main__":
             all_jts2d = filter_jts(all_jts2d_dope, window=5)
             all_jts3d = filter_jts(all_jts3d_dope, window=5)
 
-
-
         # REL-POSE for DOPE
         all_r2c_trnsfms, all_jts3d_cam = compute_root2cam_ops(all_jts2d, all_jts3d)
         all_jts3d_prcrst_pose_rel, all_jts3d_prcrst_algnd = compute_relp_cam_from_jts3d(all_jts3d_cam, rel_type='REF')
 
-        import open3d as o3d
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.pybind.utility.Vector3dVector(all_jts3d_cam[0])
-        fpth = osp.join(RES_DIR, sqn, 'dope_jts3d_cam_frm1.ply')
-        o3d.io.write_point_cloud(fpth, pcd, write_ascii=True)
-        np.savetxt(fpth.replace('ply', 'txt'), all_jts3d_cam[0])
+        # import open3d as o3d
+        # pcd = o3d.geometry.PointCloud()
+        # pcd.points = o3d.pybind.utility.Vector3dVector(all_jts3d_cam[0])
+        # fpth = osp.join(RES_DIR, sqn, 'dope_jts3d_cam_frm1.ply')
+        # o3d.io.write_point_cloud(fpth, pcd, write_ascii=True)
+        # np.savetxt(fpth.replace('ply', 'txt'), all_jts3d_cam[0])
         
         # REPRJ Error on r2cs
         projtd_jts2d = []
@@ -233,7 +231,50 @@ if __name__ == "__main__":
                 )
             all_poses_ann_prcst_rel, all_jts3d_ann_prcst_algnd = compute_relp_cam_from_jts3d(all_jts3d_ann, rel_type='REF')
         
-        # bb()
+        # # translation error: (added block to evaluate same as SRA)
+        abs_tran_err = np.linalg.norm((all_poses_ann_prcst_rel[:, :3, 3] - all_jts3d_prcrst_pose_rel[:, :3, 3]), axis=1)
+        print(f'Absolute Translation Error: {abs_tran_err.mean():.3f} m')
+        rel_tran_gt = all_poses_ann_prcst_rel[:, None, :3, 3] - all_poses_ann_prcst_rel[:, :3, 3]
+        rel_tran_est = all_jts3d_prcrst_pose_rel[:, None, :3, 3] - all_jts3d_prcrst_pose_rel[:, :3, 3]
+        rel_tran_err = np.linalg.norm((rel_tran_gt-rel_tran_est), axis=2)
+        print(f'Rel Tran. Err.: {rel_tran_err.mean():.3f} m')
+        import roma, torch
+        def compute_relrot_mat_geodist(gt_rots, est_rots):
+            # relrot_mat_estim = np.linalg.inv(est_rots[:, None, :3, :3]) @ est_rots[:, :3, :3]
+            # relrot_mat_gt = np.linalg.inv(gt_rots[:, None, :3, :3]) @ gt_rots[:, :3, :3]
+            relrot_mat_estim = est_rots[:, :3, :3] @ np.linalg.inv(est_rots[:, None, :3, :3])
+            relrot_mat_gt = gt_rots[:, :3, :3] @ np.linalg.inv(gt_rots[:, None, :3, :3])
+            relrot_diff = roma.rotmat_geodesic_distance_naive(torch.tensor(relrot_mat_gt), torch.tensor(relrot_mat_estim)) * 180 / np.pi
+            print(f"RR Mat. Geod. Dist. w.r.t ALL ref frms : {(relrot_diff).mean():.5f} deg")
+            return relrot_diff
+        def compute_relrot_amp_geodist(gt_rots, est_rots, ref_frm_ind=None):
+            # err wrt all ref frames
+            relrot_allrefs_gt = np.array(
+                roma.rotmat_geodesic_distance_naive(torch.tensor(gt_rots[:, None, :3, :3]), torch.tensor(gt_rots[:, :3, :3]))
+                ) * 180 / np.pi
+            relrot_allrefs_est = np.array(
+                roma.rotmat_geodesic_distance_naive(torch.tensor(est_rots[:, None, :3, :3]), torch.tensor(est_rots[:, :3, :3]))
+                ) * 180 / np.pi
+            rel_rot_diff = np.abs(relrot_allrefs_gt - relrot_allrefs_est)
+            print(f"RR Amp. Geod. Dist. w.r.t ALL ref frms : {rel_rot_diff.mean():.5f} deg")
+
+            # err with single ref frame
+            if ref_frm_ind is not None:
+                rel_rot_estim = np.array(
+                        [roma.rotmat_geodesic_distance_naive(torch.tensor(est_rots[idx, :3, :3]), torch.tensor(est_rots[ref_frm_ind, :3, :3]))
+                        for idx in range(len(est_rots))]
+                        ) * 180 / np.pi
+                rel_rot_gt = np.array(
+                        [roma.rotmat_geodesic_distance_naive(torch.tensor(gt_rots[idx, :3, :3]), torch.tensor(gt_rots[ref_frm_ind, :3, :3]))
+                        for idx in range(len(gt_rots))]
+                        ) * 180 / np.pi
+                rel_rot_diff = np.abs(rel_rot_estim - rel_rot_gt)
+                print(f"RR Geod. Dist. w.r.t ref_frm_ind-{ref_frm_ind} : {(np.abs(rel_rot_diff).mean()):.5f} deg")
+
+        print(f'Dope detection rate: {(len(all_jts3d_dope)/len(all_jts3d_ann_pths))*100:.2f}')
+        relrot_err_mat = compute_relrot_mat_geodist(gt_rots=all_poses_ann_prcst_rel[:, :3, :3], est_rots=all_jts3d_prcrst_pose_rel[:, :3, :3]);
+        relrot_err_amp = compute_relrot_amp_geodist(gt_rots=all_poses_ann_prcst_rel[:, :3, :3], est_rots=all_jts3d_prcrst_pose_rel[:, :3, :3], ref_frm_ind=None);
+        bb()
         ## Relative rotation erorr
         # using rel-pose obtained from ann poses
         all_rel_rot_err = np.array(
@@ -262,12 +303,7 @@ if __name__ == "__main__":
         print("all_jts3d_prcrst_pose_rel_tran_err:", all_jts3d_prcrst_pose_rel_tran_err.mean(), 'm')
         # _ = disp_tran_err(all_jts3d_prcrst_pose_rel_tran_err, just_mean=True)
 
-        # do not use below values
-        # print("all_rel_rot_err:", all_rel_rot_err.mean())
-        # _ = disp_rot_err(all_rel_rot_err, just_mean=True)
-        # print("all_rel_tran_err:", all_rel_tran_err.mean())
-        # _ = disp_tran_err(all_rel_tran_err, just_mean=True)
-
+        
         print('Saving the rel pose error')
         save_dict = {
             'sqn' : sqn,
@@ -278,10 +314,10 @@ if __name__ == "__main__":
             'RTE_mean' : np.mean(all_jts3d_prcrst_pose_rel_tran_err),
             'missing_det_info': all_missing_dets_info
         }
-        save_dict_pth = osp.join(RES_DIR, sqn, 'eval_rel_pose_dope.pkl')
-        saveas_pkl(save_dict, save_dict_pth)
-        print(f"save here: {save_dict_pth}")
-
+        # save_dict_pth = osp.join(RES_DIR, sqn, 'eval_rel_pose_dope.pkl')
+        # saveas_pkl(save_dict, save_dict_pth)
+        # print(f"save here: {save_dict_pth}")
+        # bb()
         if args.save:
             # bb()
             for idx, relp in tqdm(enumerate(all_jts3d_prcrst_pose_rel)):
