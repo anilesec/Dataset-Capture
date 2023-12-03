@@ -145,8 +145,9 @@ if __name__ == "__main__":
 
     all_seqs_mean_RRE = []
     all_seqs_mean_RTE = []
-
+    # showme_test_seqs = ["20220812180133", "20220819155412", "20220819162529", "20220819164041", "20220902163904", "20220902163950", "20220902164854", "20220902170443", "20220913144436", "20220913145135"]
     for sqn in tqdm(all_sqns):
+    # for sqn in tqdm(showme_test_seqs):
         print(f"sqn: {sqn}")
         
         # all_poses_ann_pths = sorted(glob.glob(osp.join(RES_DIR, sqn, 'icp_res/*/f_trans.txt')))
@@ -165,6 +166,7 @@ if __name__ == "__main__":
 
         missing_dets_frms = []
         save_dict = dict()
+        bb()
         print('Load Dope dets and Annotated jts...')
         for j2d_annp, j3d_annp in zip(all_jts2d_ann_pths, all_jts3d_ann_pths):
             dope_pkl_pth = pathlib.Path(osp.join(DOPE_DETS_FIX_DIR, sqn, 'handexp_dets', osp.basename(j3d_annp)).replace('txt', 'pkl'))
@@ -193,6 +195,8 @@ if __name__ == "__main__":
 
         all_poses_ann = np.array(all_poses_ann)
 
+        
+
         all_missing_dets_info = [missing_dets_frms, len(missing_dets_frms), len(missing_dets_frms) / (len(all_jts3d_ann)+len(missing_dets_frms))]
 
         assert len(all_jts3d_dope) == len(all_jts3d_ann), f"missamatch b/w dope {all_jts3d_dope.shape} and ann 3Djts {all_jts3d_ann.shape}"
@@ -202,9 +206,7 @@ if __name__ == "__main__":
         if args.filter:
             all_jts2d = filter_jts(all_jts2d_dope, window=5)
             all_jts3d = filter_jts(all_jts3d_dope, window=5)
-
-
-
+        # bb()
         # REL-POSE for DOPE
         all_r2c_trnsfms, all_jts3d_cam = compute_root2cam_ops(all_jts2d, all_jts3d)
         all_jts3d_prcrst_pose_rel, all_jts3d_prcrst_algnd = compute_relp_cam_from_jts3d(all_jts3d_cam, rel_type='REF')
@@ -228,7 +230,47 @@ if __name__ == "__main__":
                 )
             all_poses_ann_prcst_rel, all_jts3d_ann_prcst_algnd = compute_relp_cam_from_jts3d(all_jts3d_ann, rel_type='REF')
         
-        # bb()
+        bb()
+        # # translation error: (added block to evaluate same as SRA)
+        abs_tran_err = np.linalg.norm((cps_ann_tran - cps_clmp_tran_algnd), axis=1)
+        print(f'Absolute Translation Error: {abs_tran_err.mean():.3f} m')
+        rel_tran_gt = cps_ann_tran[:, None, :] - cps_ann_tran
+        rel_tran_est = cps_clmp_tran_algnd[:, None, :] - cps_clmp_tran_algnd
+        rel_tran_err = np.linalg.norm((rel_tran_gt-rel_tran_est), axis=2)
+        print(f'Rel Tran. Err.: {rel_tran_err.mean():.3f} m')
+        import roma, torch
+        def compute_relrot_mat_geodist(gt_rots, est_rots):
+            relrot_mat_estim = np.linalg.inv(est_rots[:, None, :3, :3]) @ est_rots[:, :3, :3]
+            relrot_mat_gt = np.linalg.inv(gt_rots[:, None, :3, :3]) @ gt_rots[:, :3, :3]
+            relrot_diff = roma.rotmat_geodesic_distance_naive(torch.tensor(relrot_mat_gt), torch.tensor(relrot_mat_estim)) * 180 / np.pi
+            print(f"RR Mat. Geod. Dist. w.r.t ALL ref frms : {(relrot_diff).mean():.5f} deg")
+            return relrot_diff
+        def compute_relrot_amp_geodist(gt_rots, est_rots, ref_frm_ind=None):
+            # err wrt all ref frames
+            relrot_allrefs_gt = np.array(
+                roma.rotmat_geodesic_distance_naive(torch.tensor(gt_rots[:, None, :3, :3]), torch.tensor(gt_rots[:, :3, :3]))
+                ) * 180 / np.pi
+            relrot_allrefs_est = np.array(
+                roma.rotmat_geodesic_distance_naive(torch.tensor(est_rots[:, None, :3, :3]), torch.tensor(est_rots[:, :3, :3]))
+                ) * 180 / np.pi
+            rel_rot_diff = np.abs(relrot_allrefs_gt - relrot_allrefs_est)
+            print(f"RR Amp. Geod. Dist. w.r.t ALL ref frms : {rel_rot_diff.mean():.5f} deg")
+
+            # err with single ref frame
+            if ref_frm_ind is not None:
+                rel_rot_estim = np.array(
+                        [roma.rotmat_geodesic_distance_naive(torch.tensor(est_rots[idx, :3, :3]), torch.tensor(est_rots[ref_frm_ind, :3, :3]))
+                        for idx in range(len(est_rots))]
+                        ) * 180 / np.pi
+                rel_rot_gt = np.array(
+                        [roma.rotmat_geodesic_distance_naive(torch.tensor(gt_rots[idx, :3, :3]), torch.tensor(gt_rots[ref_frm_ind, :3, :3]))
+                        for idx in range(len(gt_rots))]
+                        ) * 180 / np.pi
+                rel_rot_diff = np.abs(rel_rot_estim - rel_rot_gt)
+                print(f"RR Geod. Dist. w.r.t ref_frm_ind-{ref_frm_ind} : {(np.abs(rel_rot_diff).mean()):.5f} deg")
+        relrot_err_mat = compute_relrot_mat_geodist(gt_rots=cps_ann[:, :3, :3], est_rots=cps_clmp[:, :3, :3]);
+        relrot_err_amp = compute_relrot_amp_geodist(gt_rots=cps_ann[:, :3, :3], est_rots=cps_clmp[:, :3, :3], ref_frm_ind=None);
+
         ## Relative rotation erorr
         # using rel-pose obtained from ann poses
         all_rel_rot_err = np.array(
@@ -273,9 +315,9 @@ if __name__ == "__main__":
             'RTE_mean' : np.mean(all_jts3d_prcrst_pose_rel_tran_err),
             'missing_det_info': all_missing_dets_info
         }
-        save_dict_pth = osp.join(RES_DIR, sqn, 'eval_rel_pose_dope_fix.pkl')
-        saveas_pkl(save_dict, save_dict_pth)
-        print(f"save here: {save_dict_pth}")
+        # save_dict_pth = osp.join(RES_DIR, sqn, 'eval_rel_pose_dope_fix.pkl')
+        # saveas_pkl(save_dict, save_dict_pth)
+        # print(f"save here: {save_dict_pth}")
         
         # bb()
         if False:
