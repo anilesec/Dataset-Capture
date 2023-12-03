@@ -255,18 +255,16 @@ if True:
         print(sqn)
         gt_mesh_pth = sorted(glob.glob(osp.join(RES_DIR, sqn, 'gt_mesh/*.obj')))[0]
         
-        if sqn == '20220705173214':
-            continue
         print(gt_mesh_pth)
         m_name = osp.basename(gt_mesh_pth)
-        # bb()
+        print(m_name)
         new_dict = {
             'sqn' : sqn,
             'subj' : m_name[:4],
-            'obj' : m_name.split('_')[1],
-            'obj_name' : m_name
+            # 'obj' : m_name.split('_')[1] if '_' in m_name else m_name,
+            'obj_name' : m_name,
         }
-        all_objs.append(m_name.split('_')[1])
+        # all_objs.append(m_name.split('_')[1])
         all_objs_names.append(m_name)
 
         import pandas as pd
@@ -315,10 +313,40 @@ if False:
     print('Done')
 
 
-# if True:
-#     # get all poses
-#     pose_pths = sorted(sorted(glob.glob('/home/aswamy/server_mounts/scratch1/user/aswamy/data/hand-obj/20220705173214/icp_res')))
-#     poses = []
-
 
 # small_objs = ['20220905111237', '20220902154737', '20220902111535', '20220909151546', '20220824105341', '20220902111409', '20220902151726', '20220909134639', '20220909120614', '20220905105332', '20220905112733', '20220913144436', '20220823115809', '20220902110304', '20220823114538', '20220829154032', '20220913154643', '20220909115705', '20220909152911', '20220909121541', '20220812172414']
+if False:
+    RES_DIR = "/scratch/1/user/aswamy/data/hand-obj"
+    all_seqs_tar_pths = glob.glob(f"{RES_DIR}/*.tar") 
+    all_sqns = []
+    for spth in tqdm(all_seqs_tar_pths):
+        if os.path.isfile(spth):
+            sqn = osp.basename(spth.split('.')[0])
+            all_sqns.append(sqn)
+        imgs_dir = osp.join(RES_DIR, sqn, 'rgb')
+        file_pth = osp.join(RES_DIR, sqn, 'vid_rgb.mp4')
+        imgs2vid_ffmpeg(imgs_dir, file_pth, ext='png', frm_rate=30)
+    print('Done!')
+
+
+if False:
+    from moviepy.editor import VideoFileClip, clips_array
+
+    vid_pths = glob.glob(osp.join(RES_DIR, f'*/vid_rgb.mp4'))
+
+    # Load all your videos
+    videos = [VideoFileClip(vpth) for vpth in vid_pths]
+
+    # Make sure all clips have the same duration as the shortest clip
+    duration = max(clip.duration for clip in videos)
+    
+    videos = [clip.subclip(0, duration) for clip in videos]
+
+    # Create a 8x12 grid
+    video_grid = [videos[n:n+8] for n in range(0, len(videos), 8)]
+
+    # Use clips_array to stitch them together
+    final_clip = clips_array(video_grid)
+
+    # Write the result to a file
+    final_clip.write_videofile("./output_8x12.mp4", codec='libx264', audio_codec='aac')
